@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PQC Migration - Digital Twin Graph</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            overflow: hidden;
+        }
+
+        #controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            border: 1px solid #e2e8f0;
+        }
+
+        .control-group {
+            margin-bottom: 8px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #graph-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .node circle {
+            stroke: #fff;
+            stroke-width: 2px;
+            transition: all 0.2s;
+        }
+
+        .node text {
+            font-size: 12px;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8), 0 -1px 3px rgba(255, 255, 255, 0.8), 1px 0 3px rgba(255, 255, 255, 0.8), -1px 0 3px rgba(255, 255, 255, 0.8);
+        }
+
+        .link {
+            stroke: #999;
+            stroke-opacity: 0.6;
+            transition: stroke-opacity 0.2s, stroke-width 0.2s;
+        }
+
+        .link.explicit {
+            stroke-width: 2.5px;
+            stroke: #475569;
+        }
+
+        .link.intra {
+            stroke-width: 1.5px;
+            stroke-dasharray: 4, 4;
+            stroke: #3b82f6;
+        }
+
+        .link.global {
+            stroke-width: 2px;
+            stroke-dasharray: 8, 4;
+            stroke: #ef4444;
+        }
+
+        /* Hover Effects */
+        .node.dimmed circle {
+            fill-opacity: 0.2;
+            stroke-opacity: 0.2;
+        }
+
+        .node.dimmed text {
+            opacity: 0.2;
+        }
+
+        .link.dimmed {
+            stroke-opacity: 0.1;
+        }
+
+        .node.highlight circle {
+            stroke: #000;
+            stroke-width: 3px;
+        }
+
+        .link.highlight {
+            stroke-opacity: 1;
+            stroke-width: 3px;
+        }
+
+        .legend-color {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="controls">
+        <h3 style="margin-top: 0; margin-bottom: 10px; font-size: 16px;">Abhängigkeiten filtern</h3>
+        <div class="control-group">
+            <label><input type="checkbox" id="cb-explicit" checked> Explizit (Solide graue Linie)</label>
+        </div>
+        <div class="control-group">
+            <label><input type="checkbox" id="cb-intra" checked> Intra-Komponente (Gepunktet blau)</label>
+        </div>
+        <div class="control-group">
+            <label><input type="checkbox" id="cb-global" checked> Global / Inter (Gestrichelt rot)</label>
+        </div>
+
+        <h3 style="margin-top: 15px; margin-bottom: 10px; font-size: 16px;">Komponenten</h3>
+        <div style="font-size: 14px;"><span class="legend-color" style="background:#10b981;"></span> ECU (Electronic
+            Control Unit)</div>
+        <div style="font-size: 14px; margin-top: 5px;"><span class="legend-color" style="background:#8b5cf6;"></span>
+            TCU (Telecommunication Unit)</div>
+        <div style="font-size: 14px; margin-top: 5px;"><span class="legend-color" style="background:#f59e0b;"></span>
+            Server Backend</div>
+    </div>
+
+    <div id="graph-container"></div>
+
+    <script>
+        // 1. Datenbasis aus der YAML-Modellierung
+        const data = {
+            nodes: [
+                // Gruppe 1: ECU
+                { id: "ECU_01", label: "ECU Container", group: 1, radius: 25 },
+                { id: "Secure Boot", label: "Secure Boot", group: 1, radius: 15 },
+                { id: "Sec_Onboard_ECU", label: "Sec Onboard Comm", group: 1, radius: 15 },
+                { id: "Secure Access", label: "Secure Access", group: 1, radius: 15 },
+                { id: "SW_Update_Mgr", label: "SW Update Mgr", group: 1, radius: 15 },
+                { id: "Cryptolib_ECU", label: "Cryptolib ECU", group: 1, radius: 18 },
+                { id: "K_pb2", label: "K_pb2 (RSA)", group: 1, radius: 12 },
+                { id: "K_1", label: "K_1 (AES)", group: 1, radius: 12 },
+                { id: "K_4", label: "K_4 (AES)", group: 1, radius: 12 },
+                { id: "K_5", label: "K_5 (AES)", group: 1, radius: 12 },
+
+                // Gruppe 2: TCU
+                { id: "TCU_01", label: "TCU Container", group: 2, radius: 25 },
+                { id: "Sec_Onboard_TCU", label: "Sec Onboard Comm", group: 2, radius: 15 },
+                { id: "Secure_Boot_TCU", label: "Secure Boot TCU", group: 2, radius: 15 },
+                { id: "Remote_Comm_TCU", label: "Remote Comm", group: 2, radius: 15 },
+                { id: "K_8", label: "K_8 (AES)", group: 2, radius: 12 },
+                { id: "K_pb7", label: "K_pb7 (RSA)", group: 2, radius: 12 },
+                { id: "K_pb16", label: "K_pb16 (RSA)", group: 2, radius: 12 },
+                { id: "K_9", label: "K_9 (AES)", group: 2, radius: 12 },
+                { id: "K_pb13", label: "K_pb13 (RSA)", group: 2, radius: 12 },
+
+                // Gruppe 3: Server
+                { id: "Server_Backend", label: "Server Backend", group: 3, radius: 25 },
+                { id: "Remote_Comm_Server", label: "Remote Comm Server", group: 3, radius: 15 },
+                { id: "SW_Update_Provider", label: "SW Update Provider", group: 3, radius: 15 },
+                { id: "K_pr14", label: "K_pr14 (RSA)", group: 3, radius: 12 },
+                { id: "K_17", label: "K_17 (AES)", group: 3, radius: 12 }
+            ],
+            links: [
+                // Explicit
+                { source: "Secure Boot", target: "Cryptolib_ECU", type: "explicit" },
+
+                // Intra-Component (Implizit)
+                { source: "Secure Boot", target: "K_pb2", type: "intra" },
+                { source: "SW_Update_Mgr", target: "K_5", type: "intra" },
+                { source: "Sec_Onboard_ECU", target: "K_1", type: "intra" },
+                { source: "Secure Access", target: "K_4", type: "intra" },
+
+                { source: "Sec_Onboard_TCU", target: "K_8", type: "intra" },
+                { source: "Secure_Boot_TCU", target: "K_pb7", type: "intra" },
+                { source: "Secure_Boot_TCU", target: "K_pb16", type: "intra" },
+                { source: "Remote_Comm_TCU", target: "K_9", type: "intra" },
+                { source: "Remote_Comm_TCU", target: "K_pb13", type: "intra" },
+
+                { source: "Remote_Comm_Server", target: "K_pr14", type: "intra" },
+                { source: "SW_Update_Provider", target: "K_17", type: "intra" },
+
+                // Global / Inter-Component (Implizit)
+                { source: "K_1", target: "K_8", type: "global" },
+                { source: "K_5", target: "K_17", type: "global" },
+                { source: "K_pb13", target: "K_pr14", type: "global" }
+            ]
+        };
+
+        // Kanten zu Containern hinzufügen, damit die Graphen-Inseln zusammenbleiben
+        const containerLinks = [
+            { source: "ECU_01", target: "Secure Boot", type: "container", hidden: true },
+            { source: "ECU_01", target: "Sec_Onboard_ECU", type: "container", hidden: true },
+            { source: "ECU_01", target: "Secure Access", type: "container", hidden: true },
+            { source: "ECU_01", target: "SW_Update_Mgr", type: "container", hidden: true },
+            { source: "TCU_01", target: "Sec_Onboard_TCU", type: "container", hidden: true },
+            { source: "TCU_01", target: "Secure_Boot_TCU", type: "container", hidden: true },
+            { source: "TCU_01", target: "Remote_Comm_TCU", type: "container", hidden: true },
+            { source: "Server_Backend", target: "Remote_Comm_Server", type: "container", hidden: true },
+            { source: "Server_Backend", target: "SW_Update_Provider", type: "container", hidden: true }
+        ];
+
+        data.links = [...data.links, ...containerLinks];
+
+        // 2. Setup D3
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const svg = d3.select("#graph-container").append("svg")
+            .attr("width", width)
+            .attr("height", height)
+            .call(d3.zoom().on("zoom", (event) => {
+                g.attr("transform", event.transform);
+            }))
+            .append("g");
+
+        const g = svg.append("g");
+
+        // Farbschema für die 3 Gruppen
+        const color = d3.scaleOrdinal()
+            .domain([1, 2, 3])
+            .range(["#10b981", "#8b5cf6", "#f59e0b"]);
+
+        // Simulation konfigurieren
+        const simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(d => d.id).distance(d => d.type === 'global' ? 200 : (d.type === 'container' ? 40 : 80)))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2))
+            .force("collide", d3.forceCollide().radius(d => d.radius + 15));
+
+        // 3. Zeichne Linien (Links)
+        const link = g.append("g")
+            .selectAll("line")
+            .data(data.links)
+            .enter().append("line")
+            .attr("class", d => `link ${d.type}`)
+            .style("display", d => d.hidden ? "none" : "block");
+
+        // 4. Zeichne Knoten (Nodes)
+        const node = g.append("g")
+            .selectAll("g")
+            .data(data.nodes)
+            .enter().append("g")
+            .attr("class", "node")
+            .call(d3.drag()
+                .on("start", dragstarted)
+                .on("drag", dragged)
+                .on("end", dragended));
+
+        node.append("circle")
+            .attr("r", d => d.radius)
+            .attr("fill", d => color(d.group));
+
+        node.append("text")
+            .attr("dx", d => d.radius + 5)
+            .attr("dy", 4)
+            .text(d => d.label);
+
+        // 5. Interaktivität (Hover)
+        node.on("mouseover", function (event, d) {
+            // Alle abdunkeln
+            node.classed("dimmed", true);
+            link.classed("dimmed", true);
+
+            // Nachbarn finden
+            const connectedNodeIds = new Set();
+            connectedNodeIds.add(d.id);
+
+            link.each(function (l) {
+                if (l.source.id === d.id || l.target.id === d.id) {
+                    if (!l.hidden && l.type !== 'container') { // Versteckte Kanten ignorieren
+                        d3.select(this).classed("dimmed", false).classed("highlight", true);
+                        connectedNodeIds.add(l.source.id);
+                        connectedNodeIds.add(l.target.id);
+                    }
+                }
+            });
+
+            // Nur verbundene Knoten hervorheben
+            node.filter(n => connectedNodeIds.has(n.id))
+                .classed("dimmed", false)
+                .classed("highlight", true);
+        })
+            .on("mouseout", function () {
+                // Reset
+                node.classed("dimmed", false).classed("highlight", false);
+                link.classed("dimmed", false).classed("highlight", false);
+            });
+
+        // 6. Tick Funktion (Animation)
+        simulation.on("tick", () => {
+            link
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+            node
+                .attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        // 7. Drag Funktionen
+        function dragstarted(event, d) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        // 8. Filter Logik
+        function updateFilters() {
+            const showExplicit = d3.select("#cb-explicit").property("checked");
+            const showIntra = d3.select("#cb-intra").property("checked");
+            const showGlobal = d3.select("#cb-global").property("checked");
+
+            link.style("display", d => {
+                if (d.type === "container") return "none";
+                if (d.type === "explicit" && !showExplicit) return "none";
+                if (d.type === "intra" && !showIntra) return "none";
+                if (d.type === "global" && !showGlobal) return "none";
+                return "block";
+            });
+        }
+
+        d3.selectAll("input[type=checkbox]").on("change", updateFilters);
+
+        // Fenstergröße anpassen
+        window.addEventListener('resize', () => {
+            svg.attr("width", window.innerWidth).attr("height", window.innerHeight);
+            simulation.force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+            simulation.alpha(0.3).restart();
+        });
+    </script>
+</body>
+
+</html>
