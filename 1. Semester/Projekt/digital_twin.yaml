@@ -1,0 +1,168 @@
+digital_twin:
+  system_name: "Automotive PQC Migration Use Case"
+  version: "1.0"
+
+  components:
+    # ---------------------------------------------------------
+    # Komponente 1: Electronic Control Unit (ECU)
+    # ---------------------------------------------------------
+    - component_id: "ECU_01"
+      name: "Electronic Control Unit"
+      type: "in-vehicle"
+      
+      security_controls:
+        - control_name: "Secure Boot"
+          description: "Verifiziert Integrität und Authentizität der Software im Boot-Vorgang"
+        - control_name: "Secure Onboard Communication"
+          description: "Sichert die Kommunikation über den internen CAN-Bus ab"
+        - control_name: "Secure Access"
+          description: "Zugriffskontrolle für Speicher und Software-Updates"
+        - control_name: "Software Update Manager"
+          description: "Verifiziert und installiert Software-Updates"
+
+      cryptographic_assets:
+        - asset_id: "K_pb2"
+          asset_type: "public_key"
+          algorithm: "RSA"
+          key_length: 2048
+          used_by: ["Secure Boot"]
+        - asset_id: "K_1"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128 CMAC"
+          used_by: ["Secure Onboard Communication"]
+        - asset_id: "K_4"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128"
+          used_by: ["Secure Access"]
+        - asset_id: "K_5"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128 CMAC"
+          used_by: ["Software Update Manager"]
+        - asset_id: "Cryptolib_ECU"
+          asset_type: "library"
+          provides: ["RSA-2048", "AES-128 CMAC", "HMAC-SHA256"]
+
+      dependencies:
+        explicit:
+          - source: "Secure Boot"
+            target: "Cryptolib_ECU"
+            type: "functional"
+        implicit:
+          - source: "Secure Boot"
+            target: "K_pb2"
+            type: "intra-component"
+          - source: "Software Update Manager"
+            target: "K_5"
+            type: "intra-component"
+
+    # ---------------------------------------------------------
+    # Komponente 2: Telecommunication Unit (TCU)
+    # ---------------------------------------------------------
+    - component_id: "TCU_01"
+      name: "Telecommunication Unit"
+      type: "in-vehicle"
+      
+      security_controls:
+        - control_name: "Secure Onboard Communication"
+          description: "Sichert die Kommunikation über den internen CAN-Bus ab"
+        - control_name: "Secure Boot"
+          description: "Verifiziert Integrität der TCU-Software"
+        - control_name: "Remote Communication"
+          description: "Kommunikation mit dem Server-Backend via TLS 1.2"
+          
+      cryptographic_assets:
+        - asset_id: "K_8"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128 CMAC"
+          used_by: ["Secure Onboard Communication"]
+        - asset_id: "K_pb7"
+          asset_type: "public_key"
+          algorithm: "RSA"
+          used_by: ["Secure Boot"]
+        - asset_id: "K_pb16"
+          asset_type: "public_key"
+          algorithm: "RSA"
+          used_by: ["Secure Boot"]
+        - asset_id: "K_9"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128"
+          used_by: ["Remote Communication"]
+        - asset_id: "K_pb13"
+          asset_type: "public_key"
+          algorithm: "RSA"
+          used_by: ["Remote Communication"]
+        
+      dependencies:
+        explicit: []
+        implicit:
+          - source: "Secure Onboard Communication"
+            target: "K_8"
+            type: "intra-component"
+          - source: "Secure Boot"
+            target: "K_pb7"
+            type: "intra-component"
+          - source: "Secure Boot"
+            target: "K_pb16"
+            type: "intra-component"
+          - source: "Remote Communication"
+            target: "K_9"
+            type: "intra-component"
+          - source: "Remote Communication"
+            target: "K_pb13"
+            type: "intra-component"
+
+    # ---------------------------------------------------------
+    # Komponente 3: Server Backend
+    # ---------------------------------------------------------
+    - component_id: "Server_Backend"
+      name: "Server Backend"
+      type: "cloud"
+      
+      security_controls:
+        - control_name: "Remote Communication"
+          description: "Kommunikation mit der TCU via TLS 1.2"
+        - control_name: "Software Update Provider"
+          description: "Bereitstellung signierter Updates für In-Vehicle-Komponenten"
+          
+      cryptographic_assets:
+        - asset_id: "K_pr14"
+          asset_type: "private_key"
+          algorithm: "RSA"
+          used_by: ["Remote Communication"]
+        - asset_id: "K_17"
+          asset_type: "symmetric_key"
+          algorithm: "AES-128 CMAC"
+          used_by: ["Software Update Provider"]
+          
+      dependencies:
+        explicit: []
+        implicit:
+          - source: "Remote Communication"
+            target: "K_pr14"
+            type: "intra-component"
+          - source: "Software Update Provider"
+            target: "K_17"
+            type: "intra-component"
+
+  # ---------------------------------------------------------
+  # Systemübergreifende (implizite) Abhängigkeiten
+  # ---------------------------------------------------------
+  global_dependencies:
+    - dependency_id: "DEP_SHARED_KEY_CAN"
+      type: "inter-component"
+      description: "Geteilter symmetrischer Schlüssel für die sichere CAN-Kommunikation zwischen ECU und TCU"
+      nodes:
+        - "ECU_01.K_1"
+        - "TCU_01.K_8"
+    - dependency_id: "DEP_EXTERNAL_UPDATE"
+      type: "external"
+      description: "Abhängigkeit der ECU zum Server-Backend für die Verifizierung von Software-Updates"
+      nodes:
+        - "ECU_01.K_5"
+        - "Server_Backend.K_17"
+    - dependency_id: "DEP_TLS_COMMUNICATION"
+      type: "external"
+      description: "TLS 1.2 Kommunikation zwischen TCU und Server-Backend"
+      nodes:
+        - "TCU_01.K_pb13"
+        - "Server_Backend.K_pr14"
