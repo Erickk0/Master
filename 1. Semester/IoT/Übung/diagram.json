@@ -1,0 +1,114 @@
+{
+    "version": 1,
+    "author": "Uri Shaked",
+    "editor": "wokwi",
+    "parts": [
+        {
+            "type": "board-esp32-devkit-c-v4",
+            "id": "esp",
+            "top": -37.58,
+            "left": -96.37,
+            "attrs": {}
+        },
+        {
+            "type": "wokwi-dht22",
+            "id": "dht1",
+            "top": -32.2,
+            "left": 40.16,
+            "attrs": {
+                "temperature": "25"
+            }
+        },
+        {
+            "type": "board-ssd1306",
+            "id": "oled1",
+            "top": 51.14,
+            "left": 115.43,
+            "attrs": {
+                "i2cAddress": "0x3c"
+            }
+        }
+    ],
+    "connections": [
+        [
+            "esp:TX",
+            "$serialMonitor:RX",
+            "",
+            []
+        ],
+        [
+            "esp:RX",
+            "$serialMonitor:TX",
+            "",
+            []
+        ],
+        [
+            "dht1:VCC",
+            "esp:3V3",
+            "red",
+            [
+                "v109.3",
+                "h-170.36",
+                "v-200.78"
+            ]
+        ],
+        [
+            "dht1:SDA",
+            "esp:15",
+            "green",
+            [
+                "v0"
+            ]
+        ],
+        [
+            "dht1:GND",
+            "esp:GND.1",
+            "black",
+            [
+                "v99.7",
+                "h-189.56",
+                "v-66.38"
+            ]
+        ],
+        [
+            "esp:3V3",
+            "oled1:VCC",
+            "green",
+            [
+                "h5.36",
+                "v-68.02",
+                "h240"
+            ]
+        ],
+        [
+            "oled1:GND",
+            "esp:GND.2",
+            "black",
+            [
+                "v-105.6",
+                "h-153.6"
+            ]
+        ],
+        [
+            "oled1:SDA",
+            "esp:21",
+            "green",
+            [
+                "v-115.2",
+                "h-163.13",
+                "v96"
+            ]
+        ],
+        [
+            "esp:22",
+            "oled1:SCL",
+            "green",
+            [
+                "h24.41",
+                "v-48.82",
+                "h144"
+            ]
+        ]
+    ],
+    "dependencies": {}
+}
