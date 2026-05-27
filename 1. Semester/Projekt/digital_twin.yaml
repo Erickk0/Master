@@ -9,6 +9,8 @@ digital_twin:
     - component_id: "ECU_01"
       name: "Electronic Control Unit"
       type: "in-vehicle"
+      phase: 2
+      not_before: ["TCU_01", "Server_Backend"]
       
       security_controls:
         - control_name: "Secure Boot"
@@ -26,21 +28,56 @@ digital_twin:
           algorithm: "RSA"
           key_length: 2048
           used_by: ["Secure Boot"]
+          migration_variants:
+            - variant_id: "K_pb2_dilithium2"
+              algorithm: "Dilithium2"
+              security_level: 1
+              key_size_bytes: 1312
+              performance: "high"
+            - variant_id: "K_pb2_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 897
+              performance: "medium"
         - asset_id: "K_1"
           asset_type: "symmetric_key"
           algorithm: "AES-128 CMAC"
           used_by: ["Secure Onboard Communication"]
+          migration_variants:
+            - variant_id: "K_1_aes256"
+              algorithm: "AES-256 CMAC"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
         - asset_id: "K_4"
           asset_type: "symmetric_key"
           algorithm: "AES-128"
           used_by: ["Secure Access"]
+          migration_variants:
+            - variant_id: "K_4_aes256"
+              algorithm: "AES-256"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
         - asset_id: "K_5"
           asset_type: "symmetric_key"
           algorithm: "AES-128 CMAC"
           used_by: ["Software Update Manager"]
+          migration_variants:
+            - variant_id: "K_5_aes256"
+              algorithm: "AES-256 CMAC"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
         - asset_id: "Cryptolib_ECU"
           asset_type: "library"
           provides: ["RSA-2048", "AES-128 CMAC", "HMAC-SHA256"]
+          migration_variants:
+            - variant_id: "Cryptolib_ECU_pqc"
+              algorithm: "LibOQS-PQ-Shield"
+              security_level: 5
+              key_size_bytes: 0
+              performance: "high"
 
       dependencies:
         explicit:
@@ -61,6 +98,8 @@ digital_twin:
     - component_id: "TCU_01"
       name: "Telecommunication Unit"
       type: "in-vehicle"
+      phase: 1
+      not_before: ["Server_Backend"]
       
       security_controls:
         - control_name: "Secure Onboard Communication"
@@ -75,22 +114,67 @@ digital_twin:
           asset_type: "symmetric_key"
           algorithm: "AES-128 CMAC"
           used_by: ["Secure Onboard Communication"]
+          migration_variants:
+            - variant_id: "K_8_aes256"
+              algorithm: "AES-256 CMAC"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
         - asset_id: "K_pb7"
           asset_type: "public_key"
           algorithm: "RSA"
           used_by: ["Secure Boot"]
+          migration_variants:
+            - variant_id: "K_pb7_dilithium2"
+              algorithm: "Dilithium2"
+              security_level: 1
+              key_size_bytes: 1312
+              performance: "high"
+            - variant_id: "K_pb7_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 897
+              performance: "medium"
         - asset_id: "K_pb16"
           asset_type: "public_key"
           algorithm: "RSA"
           used_by: ["Secure Boot"]
+          migration_variants:
+            - variant_id: "K_pb16_dilithium2"
+              algorithm: "Dilithium2"
+              security_level: 1
+              key_size_bytes: 1312
+              performance: "high"
+            - variant_id: "K_pb16_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 897
+              performance: "medium"
         - asset_id: "K_9"
           asset_type: "symmetric_key"
           algorithm: "AES-128"
           used_by: ["Remote Communication"]
+          migration_variants:
+            - variant_id: "K_9_aes256"
+              algorithm: "AES-256"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
         - asset_id: "K_pb13"
           asset_type: "public_key"
           algorithm: "RSA"
           used_by: ["Remote Communication"]
+          migration_variants:
+            - variant_id: "K_pb13_dilithium2"
+              algorithm: "Dilithium2"
+              security_level: 1
+              key_size_bytes: 1312
+              performance: "high"
+            - variant_id: "K_pb13_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 897
+              performance: "medium"
         
       dependencies:
         explicit: []
@@ -117,6 +201,8 @@ digital_twin:
     - component_id: "Server_Backend"
       name: "Server Backend"
       type: "cloud"
+      phase: 1
+      not_before: []
       
       security_controls:
         - control_name: "Remote Communication"
@@ -129,10 +215,27 @@ digital_twin:
           asset_type: "private_key"
           algorithm: "RSA"
           used_by: ["Remote Communication"]
+          migration_variants:
+            - variant_id: "K_pr14_dilithium2"
+              algorithm: "Dilithium2"
+              security_level: 1
+              key_size_bytes: 2528
+              performance: "high"
+            - variant_id: "K_pr14_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 1281
+              performance: "medium"
         - asset_id: "K_17"
           asset_type: "symmetric_key"
           algorithm: "AES-128 CMAC"
           used_by: ["Software Update Provider"]
+          migration_variants:
+            - variant_id: "K_17_aes256"
+              algorithm: "AES-256 CMAC"
+              security_level: 5
+              key_size_bytes: 32
+              performance: "high"
           
       dependencies:
         explicit: []

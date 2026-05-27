@@ -1,0 +1,13 @@
+- name: PQC Migration Step 8
+  hosts: in_vehicle_devices
+  gather_facts: false
+  vars:
+    migrated_nodes:
+    - ECU_01.K_4
+  tasks:
+  - name: Deploy Post-Quantum Cryptographic Assets & Keys
+    ansible.builtin.copy:
+      content: '# PQC Migrated Keys and Algorithms
+
+        # Nodes: ECU_01.K_4'
+      dest: /etc/pqc/keys_step_8.conf

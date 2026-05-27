@@ -1,0 +1,14 @@
+- name: PQC Migration Step 10
+  hosts: in_vehicle_devices
+  gather_facts: false
+  vars:
+    migrated_nodes:
+    - TCU_01.K_8
+    - ECU_01.K_1
+  tasks:
+  - name: Deploy Post-Quantum Cryptographic Assets & Keys
+    ansible.builtin.copy:
+      content: '# PQC Migrated Keys and Algorithms
+
+        # Nodes: TCU_01.K_8, ECU_01.K_1'
+      dest: /etc/pqc/keys_step_10.conf

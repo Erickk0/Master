@@ -1,0 +1,13 @@
+- name: PQC Migration Step 6
+  hosts: in_vehicle_devices
+  gather_facts: false
+  vars:
+    migrated_nodes:
+    - TCU_01.K_pb16
+  tasks:
+  - name: Deploy Post-Quantum Cryptographic Assets & Keys
+    ansible.builtin.copy:
+      content: '# PQC Migrated Keys and Algorithms
+
+        # Nodes: TCU_01.K_pb16'
+      dest: /etc/pqc/keys_step_6.conf

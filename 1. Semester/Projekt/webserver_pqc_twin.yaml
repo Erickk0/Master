@@ -9,6 +9,8 @@ digital_twin:
     - component_id: "Webserver_Classic"
       name: "Nginx Standard Webserver"
       type: "server"
+      phase: 1
+      not_before: []
       
       security_controls:
         - control_name: "TLS 1.2 / 1.3 Communication"
@@ -19,10 +21,27 @@ digital_twin:
           asset_type: "certificate"
           algorithm: "RSA-2048"
           used_by: ["TLS 1.2 / 1.3 Communication"]
+          migration_variants:
+            - variant_id: "Cert_RSA2048_mldsa44"
+              algorithm: "ML-DSA-44"
+              security_level: 1
+              key_size_bytes: 1312
+              performance: "high"
+            - variant_id: "Cert_RSA2048_mldsa65"
+              algorithm: "ML-DSA-65"
+              security_level: 3
+              key_size_bytes: 1952
+              performance: "medium"
         - asset_id: "KeyExchange_ECDHE"
           asset_type: "key_exchange"
-          algorithm: "ECDHE" # Elliptic Curve Diffie-Hellman
+          algorithm: "ECDHE"
           used_by: ["TLS 1.2 / 1.3 Communication"]
+          migration_variants:
+            - variant_id: "KeyExchange_ECDHE_mlkem768"
+              algorithm: "X25519_MLKEM768"
+              security_level: 3
+              key_size_bytes: 1184
+              performance: "high"
 
       dependencies:
         explicit: []
@@ -37,6 +56,8 @@ digital_twin:
     - component_id: "Webserver_PQC"
       name: "OQS Nginx Webserver"
       type: "server"
+      phase: 2
+      not_before: ["Webserver_Classic"]
       
       security_controls:
         - control_name: "Hybrid TLS 1.3 Communication"
@@ -45,12 +66,29 @@ digital_twin:
       cryptographic_assets:
         - asset_id: "Cert_ML_DSA"
           asset_type: "certificate"
-          algorithm: "ML-DSA-44" # (Ehemals Dilithium)
+          algorithm: "ML-DSA-44"
           used_by: ["Hybrid TLS 1.3 Communication"]
+          migration_variants:
+            - variant_id: "Cert_ML_DSA_mldsa65"
+              algorithm: "ML-DSA-65"
+              security_level: 3
+              key_size_bytes: 1952
+              performance: "medium"
+            - variant_id: "Cert_ML_DSA_falcon512"
+              algorithm: "Falcon-512"
+              security_level: 1
+              key_size_bytes: 897
+              performance: "medium"
         - asset_id: "KeyExchange_ML_KEM"
           asset_type: "key_exchange"
-          algorithm: "X25519_MLKEM768" # Hybrid (Klassisch + Kyber)
+          algorithm: "X25519_MLKEM768"
           used_by: ["Hybrid TLS 1.3 Communication"]
+          migration_variants:
+            - variant_id: "KeyExchange_ML_KEM_mlkem1024"
+              algorithm: "X25519_MLKEM1024"
+              security_level: 5
+              key_size_bytes: 1568
+              performance: "medium"
 
       dependencies:
         explicit: []
