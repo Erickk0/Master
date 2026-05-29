@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🛡️ CRYME - PQC Webserver Migration Digital Twin</title>
+  
+  <!-- Font Imports -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <!-- Vis.js CSS & JS via CDN -->
+  <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet" type="text/css" />
+  
+  <!-- Custom Style Sheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  
+  <div class="app-container">
+    
+    <!-- Left Sidebar: Controls & Metrics -->
+    <aside class="sidebar glass-card">
+      <div class="logo-area">
+        <h1>🛡️ CRYME</h1>
+        <p class="subtitle">PQC Migration Digital Twin</p>
+      </div>
+      
+      <hr class="separator">
+      
+      <!-- Database Connection Status Badge -->
+      <div class="status-panel">
+        <h3>🗄️ Database Connection</h3>
+        <div id="db-status-badge" class="db-badge online">
+          <span class="status-dot"></span>
+          <span class="status-text">MEMGRAPH: ONLINE</span>
+        </div>
+        <p class="db-meta">bolt://localhost:7687</p>
+        <button id="btn-sync" class="btn btn-secondary" title="Sync local digital twin YAML configuration to Memgraph">
+          💾 Sync YAML to Memgraph
+        </button>
+      </div>
+      
+      <hr class="separator">
+      
+      <!-- Simulation Controls -->
+      <div class="control-panel">
+        <h3>🕹️ Simulation Center</h3>
+        <p class="section-desc">Deploy PQC steps in sequence, dynamically discover dependencies, and validate in real-time.</p>
+        
+        <div class="stats-counter">
+          <div class="stat-box">
+            <span class="stat-val" id="lbl-step">0</span>
+            <span class="stat-lbl">Active Step</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-val" id="lbl-status">Classic</span>
+            <span class="stat-lbl">System State</span>
+          </div>
+        </div>
+
+        <button id="btn-step" class="btn btn-primary">▶️ Deploy Next Step</button>
+        <button id="btn-revert" class="btn btn-warning" title="Undo the last migration step or discovered edge" disabled>⏪ Revert Last Step</button>
+        <button id="btn-reset" class="btn btn-danger">🔄 Reset Simulation</button>
+      </div>
+
+      <hr class="separator">
+      
+      <!-- Scenario Information -->
+      <div class="info-panel">
+        <h3>🕸️ Active Scenario</h3>
+        <p class="scenario-name">Webserver PQC Scenario</p>
+        <p class="scenario-desc">Representing the transition of pre-quantum standard Nginx servers and browser endpoints to post-quantum hybrid cryptographic negotiations.</p>
+      </div>
+    </aside>
+    
+    <!-- Main Content Area: Graph Canvas & Details -->
+    <main class="main-content">
+      
+      <!-- Top Header -->
+      <header class="main-header glass-card">
+        <div class="header-title-area">
+          <h2>🛡️ CRYME: <span class="gradient-text">PQC Webserver Migration Oracle</span></h2>
+          <p>Live Graph Database-Backed State Machine, Constraint Verification & Playbook Explorer</p>
+        </div>
+        <div class="header-actions">
+          <button id="btn-toggle-yaml" class="btn btn-secondary header-tab-btn" title="Open YAML Digital Twin Configuration Editor">
+            📝 Edit YAML
+          </button>
+          <button id="btn-toggle-playbook" class="btn btn-secondary header-tab-btn" title="Open compiled Ansible Playbook Viewer">
+            📜 View Playbook
+          </button>
+        </div>
+      </header>
+      
+      <!-- Graph Canvas Panel -->
+      <section class="canvas-panel glass-card">
+        <div class="panel-header">
+          <h3>🕸️ Interactive Live Topology Graph (Memgraph-Backed)</h3>
+          <div class="graph-toolbar">
+            <button id="btn-zoom-in" class="btn btn-mini toolbar-btn" title="Zoom In">➕ Zoom In</button>
+            <button id="btn-zoom-out" class="btn btn-mini toolbar-btn" title="Zoom Out">➖ Zoom Out</button>
+            <button id="btn-zoom-fit" class="btn btn-mini toolbar-btn" title="Center Graph">🎯 Center Graph</button>
+            <button id="btn-fullscreen" class="btn btn-mini toolbar-btn" title="Toggle Fullscreen">🖥️ Fullscreen</button>
+          </div>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-dot color-classic"></span>Classic</span>
+            <span class="legend-item"><span class="legend-dot color-migrated"></span>Migrated (PQC)</span>
+            <span class="legend-item"><span class="legend-dot color-discovered"></span>Discovered Dependency</span>
+          </div>
+        </div>
+        
+        <div id="graph-network-canvas" class="canvas-container"></div>
+      </section>
+      
+      <!-- Grid Panel: Oracle Console and Parameter Selection -->
+      <div class="details-grid">
+        
+        <!-- Oracle Terminal Console -->
+        <section class="terminal-panel glass-card">
+          <h3>💻 Oracle Verification Terminal</h3>
+          <div class="terminal-window">
+            <div class="terminal-titlebar">
+              <span class="terminal-dot close-dot"></span>
+              <span class="terminal-dot minimize-dot"></span>
+              <span class="terminal-dot expand-dot"></span>
+              <span class="terminal-title">oracle_verification_shell.sh</span>
+            </div>
+            <div id="oracle-console" class="terminal-console">
+              <div class="console-line system">[info] Web Application initialized. Click "Deploy Next Step" to verify and mutate database status...</div>
+            </div>
+          </div>
+        </section>
+        
+        <!-- Parameter Selection panel (Relocated here!) -->
+        <section class="customizer-panel glass-card">
+          <h3>🧬 Parameterized Algorithm Pre-Selection</h3>
+          <div class="customizer-grid" id="variants-container">
+            <div class="customizer-item">
+              <label>Variant for Cert_RSA2048</label>
+              <select id="sel-Cert_RSA2048" class="form-select">
+                <option value="ML-DSA-44">ML-DSA-44 (NIST Level 1 - 1312 Bytes)</option>
+                <option value="ML-DSA-65">ML-DSA-65 (NIST Level 3 - 1952 Bytes)</option>
+              </select>
+            </div>
+            <div class="customizer-item">
+              <label>Variant for KeyExchange_ECDHE</label>
+              <select id="sel-KeyExchange_ECDHE" class="form-select">
+                <option value="X25519_MLKEM768">X25519_MLKEM768 (NIST Level 3 - 1184 Bytes)</option>
+              </select>
+            </div>
+            <div class="customizer-item">
+              <label>Variant for Cert_ML_DSA</label>
+              <select id="sel-Cert_ML_DSA" class="form-select">
+                <option value="ML-DSA-65">ML-DSA-65 (NIST Level 3 - 1952 Bytes)</option>
+                <option value="Falcon-512">Falcon-512 (NIST Level 1 - 897 Bytes)</option>
+              </select>
+            </div>
+            <div class="customizer-item">
+              <label>Variant for KeyExchange_ML_KEM</label>
+              <select id="sel-KeyExchange_ML_KEM" class="form-select">
+                <option value="X25519_MLKEM1024">X25519_MLKEM1024 (NIST Level 5 - 1568 Bytes)</option>
+              </select>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+      
+    </main>
+    
+  </div>
+
+  <!-- Drawer Overlay -->
+  <div id="drawer-overlay" class="drawer-overlay"></div>
+
+  <!-- YAML Configuration Editor Drawer -->
+  <div id="drawer-yaml" class="drawer">
+    <div class="drawer-header">
+      <div class="drawer-header-title">
+        <h3>📝 Digital Twin YAML Configuration</h3>
+        <p class="drawer-desc">Modify components, assets, or implicit dependencies. Click Save to validate syntax, update the file, and re-sync database live.</p>
+      </div>
+      <button id="btn-close-yaml" class="btn-close" title="Close Drawer">✕</button>
+    </div>
+    <div class="drawer-content">
+      <textarea id="yaml-textarea" class="yaml-editor-textarea" spellcheck="false" placeholder="Loading digital twin configuration..."></textarea>
+    </div>
+    <div class="drawer-footer">
+      <button id="btn-load-yaml" class="btn btn-secondary">🔄 Revert Changes</button>
+      <button id="btn-save-yaml" class="btn btn-primary success-btn">💾 Save & Re-Sync Database</button>
+    </div>
+  </div>
+
+  <!-- Ansible Playbook Drawer -->
+  <div id="drawer-ansible" class="drawer">
+    <div class="drawer-header">
+      <div class="drawer-header-title">
+        <h3>📜 Compiled Ansible Playbook</h3>
+        <p class="drawer-desc">Inspect or download the Ansible playbook code compiled dynamically for the PQC migration steps verified by the Oracle.</p>
+      </div>
+      <button id="btn-close-ansible" class="btn-close" title="Close Drawer">✕</button>
+    </div>
+    <div class="drawer-content">
+      <div class="drawer-playbook-toolbar">
+        <button id="btn-download" class="btn btn-mini" disabled>📥 Download playbook.yml</button>
+      </div>
+      <pre id="playbook-code-viewer" class="code-viewer"><code># Playbook will compile dynamically upon successful steps...</code></pre>
+    </div>
+  </div>
+  
+  <!-- JavaScript Controller Module -->
+  <script src="app.js"></script>
+</body>
+</html>

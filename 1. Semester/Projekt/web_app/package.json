@@ -1,0 +1,14 @@
+{
+  "name": "cryme-pqc-web-app",
+  "version": "1.0.0",
+  "description": "Memgraph-backed Post-Quantum Cryptographic Migration Oracle Simulation for Webserver Scenario",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "neo4j-driver": "^5.20.0",
+    "js-yaml": "^4.1.0"
+  }
+}
