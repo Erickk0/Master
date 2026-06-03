@@ -50,53 +50,7 @@ digital_twin:
             target: "Cert_RSA2048"
             type: "intra-component"
 
-    # ---------------------------------------------------------
-    # Zustand B: Migrierter Webserver (Post-Quantum)
-    # ---------------------------------------------------------
-    - component_id: "Webserver_PQC"
-      name: "OQS Nginx Webserver"
-      type: "server"
-      phase: 2
-      not_before: ["Webserver_Classic"]
-      
-      security_controls:
-        - control_name: "Hybrid TLS 1.3 Communication"
-          description: "Nutzt PQC-Algorithmen (NIST-Standards) für Kapselung und Signatur"
-          
-      cryptographic_assets:
-        - asset_id: "Cert_ML_DSA"
-          asset_type: "certificate"
-          algorithm: "ML-DSA-44"
-          used_by: ["Hybrid TLS 1.3 Communication"]
-          migration_variants:
-            - variant_id: "Cert_ML_DSA_mldsa65"
-              algorithm: "ML-DSA-65"
-              security_level: 3
-              key_size_bytes: 1952
-              performance: "medium"
-            - variant_id: "Cert_ML_DSA_falcon512"
-              algorithm: "Falcon-512"
-              security_level: 1
-              key_size_bytes: 897
-              performance: "medium"
-        - asset_id: "KeyExchange_ML_KEM"
-          asset_type: "key_exchange"
-          algorithm: "X25519_MLKEM768"
-          used_by: ["Hybrid TLS 1.3 Communication"]
-          migration_variants:
-            - variant_id: "KeyExchange_ML_KEM_mlkem1024"
-              algorithm: "X25519_MLKEM1024"
-              security_level: 5
-              key_size_bytes: 1568
-              performance: "medium"
-
-      dependencies:
-        explicit: []
-        implicit:
-          - source: "Hybrid TLS 1.3 Communication"
-            target: "Cert_ML_DSA"
-            type: "intra-component"
-
+  
   # ---------------------------------------------------------
   # Globale Abhängigkeiten (Das Client-Problem)
   # ---------------------------------------------------------

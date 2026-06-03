@@ -2,132 +2,37 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const yaml = require('js-yaml');
-const neo4j = require('neo4j-driver');
+
+const {
+  driver,
+  YAML_PATH,
+  computeSCCs,
+  computeTransitiveReduction,
+  loadStateFromDB,
+  checkOracleValidation,
+  generatePlaybookContent,
+  savePlaybookAndLog
+} = require('./oracle');
 
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Memgraph connection parameters
-const URI = "bolt://localhost:7687";
-const driver = neo4j.driver(URI, neo4j.auth.basic("", ""));
-
-// Paths
-const YAML_PATH = path.join(__dirname, '../webserver_pqc_twin.yaml');
-
-// Active simulation state (in-memory caching combined with database write-back)
+// Active simulation state (read-cache of database state)
 let simState = {
   initialized: false,
   step_counter: 0,
   is_completed: false,
   history: [],
-  S_nodes: new Set(),         // set of migrated node IDs
-  E_known: new Set(),         // set of currently known edges "u->v"
-  nodes: new Set(),           // set of all node IDs
-  E_explicit: new Set(),      // structural ground truth edges
-  E_implicit: new Set(),      // implicit / hidden ground truth edges
-  component_phases: {},       // comp_id -> { phase, not_before: [] }
-  asset_variants: {},         // node_id -> [variants]
-  active_variants: {}         // node_id -> selected_variant
+  S_nodes: new Set(),
+  E_known: new Set(),
+  nodes: new Set(),
+  E_explicit: new Set(),
+  E_implicit: new Set(),
+  component_phases: {},
+  asset_variants: {},
+  active_variants: {}
 };
-
-// ============================================================================
-// Helper Graph Algorithms (Transitive Reduction, SCCs, Condensation)
-// ============================================================================
-
-function computeSCCs(nodes, edges) {
-  // Tarjan's Strongly Connected Components algorithm
-  let index = 0;
-  let stack = [];
-  let indices = {};
-  let lowlink = {};
-  let onStack = {};
-  let sccs = [];
-
-  let adj = {};
-  nodes.forEach(n => adj[n] = []);
-  edges.forEach(e => {
-    let [u, v] = e.split('->');
-    if (adj[u]) adj[u].push(v);
-  });
-
-  function strongConnect(v) {
-    indices[v] = index;
-    lowlink[v] = index;
-    index++;
-    stack.push(v);
-    onStack[v] = true;
-
-    (adj[v] || []).forEach(w => {
-      if (indices[w] === undefined) {
-        strongConnect(w);
-        lowlink[v] = Math.min(lowlink[v], lowlink[w]);
-      } else if (onStack[w]) {
-        lowlink[v] = Math.min(lowlink[v], indices[w]);
-      }
-    });
-
-    if (lowlink[v] === indices[v]) {
-      let scc = [];
-      let w;
-      do {
-        w = stack.pop();
-        onStack[w] = false;
-        scc.push(w);
-      } while (w !== v);
-      sccs.push(scc);
-    }
-  }
-
-  nodes.forEach(v => {
-    if (indices[v] === undefined) {
-      strongConnect(v);
-    }
-  });
-
-  return sccs;
-}
-
-function computeTransitiveReduction(nodes, edges) {
-  // Floyd-Warshall reachability to find redundant direct edges
-  let reach = {};
-  nodes.forEach(u => {
-    reach[u] = {};
-    nodes.forEach(v => reach[u][v] = (u === v));
-  });
-
-  edges.forEach(e => {
-    let [u, v] = e.split('->');
-    reach[u][v] = true;
-  });
-
-  nodes.forEach(k => {
-    nodes.forEach(i => {
-      nodes.forEach(j => {
-        if (reach[i][k] && reach[k][j]) {
-          reach[i][j] = true;
-        }
-      });
-    });
-  });
-
-  let reduced = new Set();
-  edges.forEach(e => {
-    let [u, v] = e.split('->');
-    // Keep edge u->v only if there is no secondary path u -> w -> v where w != u,v
-    let hasAlternativePath = false;
-    nodes.forEach(w => {
-      if (w !== u && w !== v && reach[u][w] && reach[w][v]) {
-        hasAlternativePath = true;
-      }
-    });
-    if (!hasAlternativePath) {
-      reduced.add(e);
-    }
-  });
-
-  return reduced;
-}
 
 // ============================================================================
 // API Endpoints
@@ -318,112 +223,12 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
   // Capture current migration variables if preserving state
   const savedSNodes = preserveState ? new Set(simState.S_nodes) : new Set();
   const savedActiveVariants = preserveState ? { ...simState.active_variants } : {};
-  const savedStepCounter = preserveState ? simState.step_counter : 0;
-  const savedIsCompleted = preserveState ? simState.is_completed : false;
   const savedHistory = preserveState ? [ ...simState.history ] : [];
 
-  simState.nodes.clear();
-  simState.E_explicit.clear();
-  simState.E_implicit.clear();
-  simState.component_phases = {};
-  simState.asset_variants = {};
-
-  // Load Component Phases and temporal dependencies
-  const comps = await session.run("MATCH (c:Component) RETURN c.id AS id, c.phase AS phase");
-  comps.records.forEach(rec => {
-    const phaseVal = rec.get('phase');
-    simState.component_phases[rec.get('id')] = {
-      phase: (phaseVal && typeof phaseVal.toNumber === 'function') ? phaseVal.toNumber() : Number(phaseVal),
-      not_before: []
-    };
-  });
-
-  const tc = await session.run("MATCH (c1:Component)-[:TEMPORAL_CONSTRAINT]->(c2:Component) RETURN c1.id AS c1, c2.id AS c2");
-  tc.records.forEach(rec => {
-    const c1 = rec.get('c1');
-    const c2 = rec.get('c2');
-    if (simState.component_phases[c1]) {
-      simState.component_phases[c1].not_before.push(c2);
-    }
-  });
-
-  // Load all graph vertices (CryptoAssets, SecurityControls)
-  const verts = await session.run("MATCH (n) WHERE n:CryptoAsset OR n:SecurityControl RETURN n.id AS id");
-  verts.records.forEach(rec => {
-    simState.nodes.add(rec.get('id'));
-  });
-
-  // Load explicit, implicit inside components
-  const expEdges = await session.run("MATCH (u)-[:EXPLICIT_DEPENDENCY|IMPLICIT_DEPENDENCY]->(v) RETURN u.id AS src, v.id AS tgt");
-  expEdges.records.forEach(rec => {
-    const src = rec.get('src');
-    const tgt = rec.get('tgt');
-    simState.nodes.add(src);
-    simState.nodes.add(tgt);
-    simState.E_explicit.add(`${src}->${tgt}`);
-  });
-
-  // Load global dependencies (bidirectional E_implicit)
-  const impEdges = await session.run("MATCH (u)-[:GLOBAL_DEPENDENCY]->(v) RETURN u.id AS src, v.id AS tgt");
-  impEdges.records.forEach(rec => {
-    const src = rec.get('src');
-    const tgt = rec.get('tgt');
-    simState.nodes.add(src);
-    simState.nodes.add(tgt);
-    simState.E_implicit.add(`${src}->${tgt}`);
-    simState.E_implicit.add(`${tgt}->${src}`);
-  });
-
-  // Load variants
-  const vars = await session.run(`
-    MATCH (a:CryptoAsset)-[:HAS_VARIANT]->(v:PQCVariant) 
-    RETURN a.id AS asset_id, v.id AS variant_id, v.algorithm AS algorithm, 
-           v.security_level AS level, v.key_size AS size, v.performance AS perf
-  `);
-  vars.records.forEach(rec => {
-    const assetId = rec.get('asset_id');
-    const levelVal = rec.get('level');
-    const sizeVal = rec.get('size');
-    const vDict = {
-      variant_id: rec.get('variant_id').split('.').pop(),
-      algorithm: rec.get('algorithm'),
-      security_level: (levelVal && typeof levelVal.toNumber === 'function') ? levelVal.toNumber() : Number(levelVal),
-      key_size_bytes: (sizeVal && typeof sizeVal.toNumber === 'function') ? sizeVal.toNumber() : Number(sizeVal),
-      performance: rec.get('perf')
-    };
-    if (!simState.asset_variants[assetId]) {
-      simState.asset_variants[assetId] = [];
-    }
-    simState.asset_variants[assetId].push(vDict);
-  });
-
-  // Rebuild base E_known starting with transitively reduced explicit edges
-  simState.E_known = computeTransitiveReduction(Array.from(simState.nodes), Array.from(simState.E_explicit));
-
   if (preserveState) {
-    // Restore saved state variables
-    simState.step_counter = savedStepCounter;
-    simState.is_completed = savedIsCompleted;
-    simState.history = savedHistory;
-
-    // Filter and restore S_nodes and active_variants
-    simState.S_nodes.clear();
-    savedSNodes.forEach(node => {
-      if (simState.nodes.has(node)) {
-        simState.S_nodes.add(node);
-      }
-    });
-
-    simState.active_variants = {};
-    for (const [node, variant] of Object.entries(savedActiveVariants)) {
-      if (simState.nodes.has(node)) {
-        simState.active_variants[node] = variant;
-      }
-    }
-
     // A. Re-commit migrated node properties to database
-    for (const node of simState.S_nodes) {
-      let varSelected = simState.active_variants[node];
+    for (const node of savedSNodes) {
+      let varSelected = savedActiveVariants[node];
       let algo = varSelected ? varSelected.algorithm : 'Post-Quantum';
       await session.run(`
         MATCH (n {id: $nodeId})
@@ -432,73 +237,68 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
     }
 
     // B. Re-create MigrationStep nodes and transitions in Memgraph
-    for (const h of simState.history) {
-      if (h.success) {
-        const validCluster = h.cluster.filter(node => simState.nodes.has(node));
-        if (validCluster.length > 0) {
-          await session.run(`
-            CREATE (s:MigrationStep {id: $id, step: $step, timestamp: timestamp(), status: 'success', cluster: $cluster})
-          `, { id: `Step_${h.step}`, step: h.step, cluster: validCluster });
-          if (h.step > 1) {
-            await session.run(`
-              MATCH (s_prev:MigrationStep {step: $prev})
-              MATCH (s_curr:MigrationStep {step: $curr})
-              CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
-            `, { prev: h.step - 1, curr: h.step });
-          }
-        }
+    for (const h of savedHistory) {
+      await session.run(`
+        CREATE (s:MigrationStep {
+          id: $id, 
+          step: $step, 
+          timestamp: timestamp(), 
+          status: $status, 
+          action: $action,
+          cluster: $cluster, 
+          logs: $logs, 
+          ansible: $ansible, 
+          variants: $variants, 
+          discovered_edge: $discovered_edge, 
+          log_file: $log_file
+        })
+      `, {
+        id: `Step_${h.step}`,
+        step: h.step,
+        status: h.success ? 'success' : (h.action === 'aborted_by_policy' ? 'aborted' : 'failed'),
+        action: h.action,
+        cluster: h.cluster || [],
+        logs: JSON.stringify(h.logs || []),
+        ansible: h.ansible || "",
+        variants: JSON.stringify(h.variants || {}),
+        discovered_edge: h.discovered_edge || null,
+        log_file: h.log_file || null
+      });
+
+      if (h.step > 1) {
+        await session.run(`
+          MATCH (s_prev:MigrationStep {step: $prev})
+          MATCH (s_curr:MigrationStep {step: $curr})
+          CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
+        `, { prev: h.step - 1, curr: h.step });
       }
     }
 
     // C. Re-create discovered implicit dependency edges in Memgraph
-    for (const h of simState.history) {
+    for (const h of savedHistory) {
       if (!h.success && h.discovered_edge) {
         const [u, v] = h.discovered_edge.split('->');
-        if (simState.nodes.has(u) && simState.nodes.has(v)) {
-          // Re-create edge in database
-          await session.run(`
-            MATCH (src {id: $u})
-            MATCH (tgt {id: $v})
-            CREATE (src)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(tgt)
-            CREATE (tgt)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(src)
-          `, { u, v, step: h.step });
-
-          // Re-add to known edges
-          simState.E_known.add(`${u}->${v}`);
-          simState.E_known.add(`${v}->${u}`);
-        }
+        await session.run(`
+          MATCH (src {id: $u})
+          MATCH (tgt {id: $v})
+          CREATE (src)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(tgt)
+          CREATE (tgt)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(src)
+        `, { u, v, step: h.step });
       }
     }
-
-    // Apply Transitive Reduction to final E_known
-    simState.E_known = computeTransitiveReduction(Array.from(simState.nodes), Array.from(simState.E_known));
-  } else {
-    // Normal reset
-    simState.step_counter = 0;
-    simState.is_completed = false;
-    simState.history = [];
-    simState.S_nodes.clear();
-    simState.active_variants = {};
   }
 
-  simState.initialized = true;
+  // Load everything fresh from the database to build the correct in-memory state
+  simState = await loadStateFromDB(session);
 }
 
 // 2. Fetch the Full Live State of the Graph
 app.get('/api/graph', async (req, res) => {
-  if (!simState.initialized) {
-    const session = driver.session();
-    try {
-      await reloadLocalStateFromDB(session);
-    } catch (err) {
-      return res.status(500).json({ success: false, error: "Database offline. Initialize it first." });
-    } finally {
-      await session.close();
-    }
-  }
-
   const session = driver.session();
   try {
+    // Reload state from database live to keep sync with CLI tool
+    simState = await loadStateFromDB(session);
+
     // Query actual nodes and their status properties from Memgraph
     const nodeRes = await session.run("MATCH (n) WHERE n:CryptoAsset OR n:SecurityControl RETURN n.id AS id, n.name AS name, n.status AS status, labels(n)[0] AS label, n.active_algorithm AS algo");
     const edgeRes = await session.run("MATCH (u)-[r]->(v) WHERE NOT type(r)='HAS_VARIANT' AND NOT type(r)='HAS_ASSET' AND NOT type(r)='HAS_CONTROL' AND NOT type(r)='TEMPORAL_CONSTRAINT' RETURN u.id AS src, v.id AS tgt, type(r) AS type, r.discovered AS disc");
@@ -560,14 +360,17 @@ app.post('/api/reset', async (req, res) => {
 
 // 3b. Revert/Undo the Last Simulation Step in both DB and Cache
 app.post('/api/revert', async (req, res) => {
-  if (simState.history.length === 0) {
-    return res.status(400).json({ success: false, error: "No steps to revert." });
-  }
-
   const session = driver.session();
   try {
+    // Sync state from database
+    simState = await loadStateFromDB(session);
+
+    if (simState.history.length === 0) {
+      return res.status(400).json({ success: false, error: "No steps to revert." });
+    }
+
     // Pop the latest step
-    const revertedStep = simState.history.pop();
+    const revertedStep = simState.history[simState.history.length - 1];
     const stepNum = revertedStep.step;
 
     if (revertedStep.success) {
@@ -593,52 +396,17 @@ app.post('/api/revert', async (req, res) => {
           MATCH (src {id: $u})-[r:IMPLICIT_DEPENDENCY {discovered: true}]-(tgt {id: $v})
           DELETE r
         `, { u, v });
-
-        // Remove from known edges and recompute transitive reduction
-        const edge1 = `${u}->${v}`;
-        const edge2 = `${v}->${u}`;
-        simState.E_known.delete(edge1);
-        simState.E_known.delete(edge2);
       }
+
+      // Also delete the failed/aborted MigrationStep node
+      await session.run(`
+        MATCH (s:MigrationStep {step: $step})
+        DETACH DELETE s
+      `, { step: stepNum });
     }
 
-    // Recalculate and transitively reduce E_known from ground truth explicit + newly discovered
-    let remainingDiscovered = [];
-    simState.history.forEach(h => {
-      if (!h.success && h.discovered_edge) {
-        remainingDiscovered.push(h.discovered_edge);
-        const [u, v] = h.discovered_edge.split('->');
-        remainingDiscovered.push(`${v}->${u}`);
-      }
-    });
-
-    // Rebuild E_known from base explicit + remaining discovered edges
-    simState.E_known = new Set(simState.E_explicit);
-    remainingDiscovered.forEach(edge => simState.E_known.add(edge));
-    simState.E_known = computeTransitiveReduction(Array.from(simState.nodes), Array.from(simState.E_known));
-
-    // Decrement step counter
-    simState.step_counter = Math.max(0, simState.step_counter - 1);
-    
-    if (simState.history.length > 0) {
-      // Find the highest step number in remaining history
-      const lastStep = simState.history[simState.history.length - 1];
-      simState.step_counter = lastStep.step;
-    } else {
-      simState.step_counter = 0;
-    }
-
-    simState.is_completed = false;
-
-    // Re-verify migrated set and variants from remaining history
-    simState.S_nodes.clear();
-    simState.active_variants = {};
-    simState.history.forEach(h => {
-      if (h.success) {
-        h.cluster.forEach(n => simState.S_nodes.add(n));
-        Object.assign(simState.active_variants, h.variants || {});
-      }
-    });
+    // Reload the fresh state from DB
+    simState = await loadStateFromDB(session);
 
     res.json({
       success: true,
@@ -653,152 +421,17 @@ app.post('/api/revert', async (req, res) => {
   }
 });
 
-// Helper: Check Oracle Constraint Compatibility Rules
-function checkOracleValidation(migratedSet, chosenVariants) {
-  let logs = [];
-  logs.push("Starting Web Application verification of PQC state...");
-  logs.push(`Currently Migrated Nodes: [${Array.from(migratedSet).join(', ')}]`);
-
-  // Rule A: Temporal Checks
-  let temporalViolations = [];
-  for (const node of migratedSet) {
-    const compId = node.split('.')[0];
-    const compInfo = simState.component_phases[compId];
-    if (compInfo) {
-      for (const nbComp of compInfo.not_before) {
-        // Find if any asset inside nbComp is unmigrated
-        const compAssets = Array.from(simState.nodes).filter(n => n.startsWith(`${nbComp}.`));
-        const unmigrated = compAssets.filter(n => !migratedSet.has(n));
-        if (unmigrated.length > 0) {
-          temporalViolations.push({ node, nbComp, unmigrated });
-        }
-      }
-    }
-  }
-
-  if (temporalViolations.length > 0) {
-    logs.push("[-] RUNTIME VERIFICATION FAILURE: Model-Driven Temporal Constraints violated!");
-    temporalViolations.forEach(v => {
-      logs.push(`  [✗] Component '${v.node.split('.')[0]}' cannot migrate yet. It requires '${v.nbComp}' to be fully migrated, but following are still Classic: [${v.unmigrated.join(', ')}]`);
-    });
-    logs.push("[-] Verification failed. Oracle Result: FAILURE (✗)");
-    return { success: false, isStructural: false, logs };
-  }
-
-  // Rule B: Structural Checks
-  let structuralViolations = [];
-  simState.E_implicit.forEach(edge => {
-    let [u, v] = edge.split('->');
-    if (migratedSet.has(u) && !migratedSet.has(v)) {
-      structuralViolations.push({ u, v });
-    }
-  });
-
-  if (structuralViolations.length > 0) {
-    logs.push("[-] RUNTIME VERIFICATION FAILURE: Unmet structural dependencies detected!");
-    structuralViolations.forEach(v => {
-      logs.push(`  [✗] Key '${v.u}' is migrated to PQC, but its communicating endpoint '${v.v}' is still Classic.`);
-    });
-    logs.push("[-] Verification failed. Oracle Result: FAILURE (✗)");
-    return { success: false, isStructural: true, logs };
-  }
-
-  // Rule C: Variant Compatibility Checks
-  let variantViolations = [];
-  simState.E_implicit.forEach(edge => {
-    let [u, v] = edge.split('->');
-    if (migratedSet.has(u) && migratedSet.has(v)) {
-      let uVar = chosenVariants[u];
-      let vVar = chosenVariants[v];
-      if (uVar && vVar) {
-        // Dilithium / ML-DSA compatibility check
-        let uAlgo = uVar.algorithm.toLowerCase();
-        let vAlgo = vVar.algorithm.toLowerCase();
-        
-        let familyU = uAlgo.split('-')[0].split('_')[0];
-        let familyV = vAlgo.split('-')[0].split('_')[0];
-        
-        let isCompat = false;
-        if ((familyU.includes("dilithium") || familyU.includes("mldsa")) && 
-            (familyV.includes("dilithium") || familyV.includes("mldsa"))) {
-          isCompat = true;
-        } else if (familyU.includes("mlkem") && familyV.includes("mlkem")) {
-          isCompat = true;
-        } else if (familyU === familyV) {
-          isCompat = true;
-        }
-
-        if (!isCompat) {
-          variantViolations.push({ u, uAlgo, v, vAlgo });
-        }
-      }
-    }
-  });
-
-  if (variantViolations.length > 0) {
-    logs.push("[-] RUNTIME VERIFICATION FAILURE: Variant Incompatibility detected!");
-    variantViolations.forEach(v => {
-      logs.push(`  [✗] Node '${v.u}' is migrated to '${v.uAlgo}', which is incompatible with '${v.v}' migrated to '${v.vAlgo}'.`);
-    });
-    logs.push("[-] Verification failed. Oracle Result: FAILURE (✗)");
-    return { success: false, isStructural: false, logs };
-  }
-
-  logs.push("[+] Service health check: TLS negotiability validated and successfully established.");
-  logs.push("[+] Cryptographic handshake: SECURE.");
-  logs.push("[+] Oracle Result: SUCCESS (✓)");
-  return { success: true, isStructural: false, logs };
-}
-
-// Helper: Compile dynamically generated Ansible playbook
-function generatePlaybookContent(cluster, stepNum, chosenVariants) {
-  let play = {
-    name: `PQC Migration Step ${stepNum}`,
-    hosts: "localhost",
-    gather_facts: false,
-    vars: {
-      migrated_nodes: Array.from(cluster)
-    },
-    tasks: []
-  };
-
-  let keysContent = "# PQC Migrated Keys and Algorithms\n";
-  Array.from(cluster).forEach(node => {
-    const varSelected = chosenVariants[node];
-    if (varSelected) {
-      keysContent += `# Node: ${node} -> Algorithm: ${varSelected.algorithm} (NIST Security Level: ${varSelected.security_level}, Key Size: ${varSelected.key_size_bytes} bytes, Performance: ${varSelected.performance.toUpperCase()})\n`;
-    } else {
-      keysContent += `# Node: ${node} -> Default PQC Config\n`;
-    }
-  });
-
-  play.tasks.push({
-    name: "Deploy Post-Quantum Cryptographic Assets & Keys",
-    "ansible.builtin.copy": {
-      content: keysContent,
-      dest: `/etc/pqc/keys_step_${stepNum}.conf`
-    }
-  });
-
-  play.tasks.push({
-    name: "Restart Migrated Services & Modules",
-    "ansible.builtin.systemd": {
-      name: "pqc_crypto_daemon",
-      state: "restarted"
-    }
-  });
-
-  return yaml.dump([play], { noRefs: true, sortKeys: false });
-}
-
 // 4. Execute a Single Simulation Step & Mutate Memgraph Live
 app.post('/api/step', async (req, res) => {
-  if (simState.is_completed) {
-    return res.json({ success: true, action: "complete", message: "Migration already completed!" });
-  }
-
   const session = driver.session();
   try {
+    // Reload state from database
+    simState = await loadStateFromDB(session);
+
+    if (simState.is_completed) {
+      return res.json({ success: true, action: "complete", message: "Migration already completed!" });
+    }
+
     // Fetch currently unvisited clusters (SCCs)
     let sccs = computeSCCs(Array.from(simState.nodes), Array.from(simState.E_known));
     let V_c = sccs.map(s => new Set(s));
@@ -811,6 +444,7 @@ app.post('/api/step', async (req, res) => {
     });
 
     if (unvisited.length === 0) {
+      await session.run("MATCH (s:MigrationStep) RETURN s"); // trivial query
       simState.is_completed = true;
       return res.json({ success: true, action: "complete", message: "PQC Migration fully completed!" });
     }
@@ -818,13 +452,11 @@ app.post('/api/step', async (req, res) => {
     simState.step_counter++;
 
     // Select a cluster Ci with no unvisited dependencies in known E_known
-    // (Meaning there's no edge from Ci to another unvisited Cj)
     let selectedCluster = null;
     for (const Ci of unvisited) {
       let hasDependency = false;
       for (const Cj of unvisited) {
         if (Ci !== Cj) {
-          // Check if there is an edge from any u in Ci to any v in Cj
           let hasEdge = false;
           Ci.forEach(u => {
             Cj.forEach(v => {
@@ -856,7 +488,7 @@ app.post('/api/step', async (req, res) => {
         if (clientVariants[node]) {
           stepVariants[node] = clientVariants[node];
         } else {
-          stepVariants[node] = vars[0]; // pick default first variant
+          stepVariants[node] = vars[0];
         }
       }
     });
@@ -868,7 +500,7 @@ app.post('/api/step', async (req, res) => {
     let proposedMigrated = new Set([...simState.S_nodes, ...selectedCluster]);
 
     // Run Oracle validation checks
-    let valResult = checkOracleValidation(proposedMigrated, simState.active_variants);
+    let valResult = checkOracleValidation(proposedMigrated, simState.active_variants, simState);
     let playbook = "";
 
     if (valResult.success) {
@@ -882,10 +514,35 @@ app.post('/api/step', async (req, res) => {
         `, { nodeId: node, step: simState.step_counter, algo: algo });
       }
 
+      // Generate Ansible playbook
+      playbook = generatePlaybookContent(selectedCluster, simState.step_counter, simState.active_variants);
+      
+      // Save playbook and log to repo
+      const files = savePlaybookAndLog(simState.step_counter, true, "migrate_success", valResult.logs, playbook);
+
       // 2. Create MigrationStep node and Transition link in Memgraph
       await session.run(`
-        CREATE (s:MigrationStep {id: $id, step: $step, timestamp: timestamp(), status: 'success', cluster: $cluster})
-      `, { id: `Step_${simState.step_counter}`, step: simState.step_counter, cluster: Array.from(selectedCluster) });
+        CREATE (s:MigrationStep {
+          id: $id, 
+          step: $step, 
+          timestamp: timestamp(), 
+          status: 'success', 
+          action: 'migrate_success',
+          cluster: $cluster,
+          logs: $logs,
+          ansible: $ansible,
+          variants: $variants,
+          log_file: $log_file
+        })
+      `, { 
+        id: `Step_${simState.step_counter}`, 
+        step: simState.step_counter, 
+        cluster: Array.from(selectedCluster),
+        logs: JSON.stringify(valResult.logs),
+        ansible: playbook,
+        variants: JSON.stringify(stepVariants),
+        log_file: files.logFile
+      });
 
       if (simState.step_counter > 1) {
         await session.run(`
@@ -894,23 +551,6 @@ app.post('/api/step', async (req, res) => {
           CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
         `, { prev: simState.step_counter - 1, curr: simState.step_counter });
       }
-
-      // Update in-memory state
-      simState.S_nodes = proposedMigrated;
-      playbook = generatePlaybookContent(selectedCluster, simState.step_counter, simState.active_variants);
-
-      let stepEntry = {
-        step: simState.step_counter,
-        cluster: Array.from(selectedCluster),
-        success: true,
-        action: "migrate_success",
-        logs: valResult.logs,
-        ansible: playbook,
-        variants: stepVariants
-      };
-
-      simState.history.push(stepEntry);
-      res.json(stepEntry);
     } else {
       // Rollback variants since step failed
       simState.active_variants = previousVariants;
@@ -934,50 +574,73 @@ app.post('/api/step', async (req, res) => {
                 CREATE (src)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(tgt)
                 CREATE (tgt)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(src)
               `, { u, v, step: simState.step_counter });
-
-              // Update in-memory known graph
-              simState.E_known.add(`${u}->${v}`);
-              simState.E_known.add(`${v}->${u}`);
               break;
             }
           }
           if (foundEdge) break;
         }
 
-        // Apply Transitive Reduction
-        simState.E_known = computeTransitiveReduction(Array.from(simState.nodes), Array.from(simState.E_known));
+        // Save failed log to repo
+        const files = savePlaybookAndLog(simState.step_counter, false, "migrate_fail", valResult.logs);
 
-        let stepEntry = {
+        // Create failed MigrationStep node in DB
+        await session.run(`
+          CREATE (s:MigrationStep {
+            id: $id, 
+            step: $step, 
+            timestamp: timestamp(), 
+            status: 'failed', 
+            action: 'migrate_fail',
+            cluster: $cluster,
+            logs: $logs,
+            discovered_edge: $discovered_edge,
+            log_file: $log_file
+          })
+        `, {
+          id: `Step_${simState.step_counter}`,
           step: simState.step_counter,
           cluster: Array.from(selectedCluster),
-          success: false,
-          action: "migrate_fail",
+          logs: JSON.stringify(valResult.logs),
           discovered_edge: foundEdge,
-          logs: valResult.logs,
-          ansible: "",
-          variants: stepVariants
-        };
-
-        simState.history.push(stepEntry);
-        res.json(stepEntry);
+          log_file: files.logFile
+        });
       } else {
-        // Temporal / Variant policy violation (rollback step counter, no graph updates)
+        // Temporal / Variant policy violation (rollback step counter)
         simState.step_counter--;
-        let stepEntry = {
+        
+        // Save aborted log to repo
+        const files = savePlaybookAndLog(simState.step_counter + 1, false, "aborted_by_policy", valResult.logs);
+
+        // Create aborted MigrationStep node in DB
+        await session.run(`
+          CREATE (s:MigrationStep {
+            id: $id, 
+            step: $step, 
+            timestamp: timestamp(), 
+            status: 'aborted', 
+            action: 'aborted_by_policy',
+            cluster: $cluster,
+            logs: $logs,
+            log_file: $log_file
+          })
+        `, {
+          id: `Step_${simState.step_counter + 1}`,
           step: simState.step_counter + 1,
           cluster: Array.from(selectedCluster),
-          success: false,
-          action: "aborted_by_policy",
-          logs: valResult.logs,
-          ansible: "",
-          variants: stepVariants
-        };
-        // Log in simulation history, but don't commit graph mutations
-        simState.history.push(stepEntry);
-        res.json(stepEntry);
+          logs: JSON.stringify(valResult.logs),
+          log_file: files.logFile
+        });
       }
     }
+
+    // Reload the fresh state from DB to sync cache
+    simState = await loadStateFromDB(session);
+    
+    // Return the step entry that was just created in DB
+    const stepEntry = simState.history[simState.history.length - 1];
+    res.json(stepEntry);
   } catch (err) {
+    console.error("[-] Step Execution Error: ", err);
     res.status(500).json({ success: false, error: err.message });
   } finally {
     await session.close();

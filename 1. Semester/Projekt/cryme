@@ -1,0 +1,364 @@
+#!/usr/bin/env node
+
+const path = require('path');
+// Dynamically resolve node modules from the web application subdirectory
+module.paths.push(path.join(__dirname, 'web_app', 'node_modules'));
+
+const fs = require('fs');
+const neo4j = require('neo4j-driver');
+
+const {
+  driver,
+  loadStateFromDB,
+  checkOracleValidation,
+  generatePlaybookContent,
+  savePlaybookAndLog,
+  computeSCCs
+} = require('./web_app/oracle');
+
+function printUsage() {
+  console.log(`
+🛡️  CRYME PQC Migration Oracle CLI Tool
+
+Usage:
+  cryme show system                        Inspect the status of all components and cryptographic assets.
+  cryme migrate id=<id_or_name> <algo>    Migrate an asset or security control to a target algorithm/variant.
+
+Examples:
+  cryme show system
+  cryme migrate id=355 TLS1.3
+  cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+`);
+}
+
+async function showSystem() {
+  const session = driver.session();
+  try {
+    const res = await session.run(`
+      MATCH (n) 
+      WHERE n:CryptoAsset OR n:SecurityControl 
+      RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo
+      ORDER BY n.id ASC
+    `);
+    
+    console.log("\n" + "=".repeat(110));
+    console.log(" ".repeat(40) + "🛡️  CRYME PQC SYSTEM STATUS ORACLE  🛡️");
+    console.log("=".repeat(110));
+    console.log(
+      " " +
+      "ID".padEnd(8) + " | " +
+      "Type".padEnd(16) + " | " +
+      "Component".padEnd(20) + " | " +
+      "Asset / Control Name".padEnd(35) + " | " +
+      "Status".padEnd(12) + " | " +
+      "Algorithm"
+    );
+    console.log("-".repeat(110));
+    
+    res.records.forEach(rec => {
+      const dbId = rec.get('db_id').toString();
+      const nodeId = rec.get('node_id');
+      const type = rec.get('type');
+      const status = rec.get('status') || 'classic';
+      const algo = rec.get('algo') || '-';
+      
+      const parts = nodeId.split('.');
+      const comp = parts[0] || '-';
+      const name = parts.slice(1).join('.').replace(/_/g, ' ') || nodeId;
+      
+      let statusColor = status === 'migrated' ? '\x1b[32mmigrated\x1b[0m' : '\x1b[31mclassic\x1b[0m';
+      
+      console.log(
+        " " +
+        dbId.padEnd(8) + " | " +
+        type.padEnd(16) + " | " +
+        comp.padEnd(20) + " | " +
+        name.padEnd(35) + " | " +
+        statusColor.padEnd(21) + " | " + // Pad adjusted to compensate for ANSI color escape chars
+        algo
+      );
+    });
+    console.log("=".repeat(110) + "\n");
+  } catch (err) {
+    console.error("[-] Error showing system: ", err.message);
+  } finally {
+    await session.close();
+  }
+}
+
+// Find compatible variant for another node in the cluster
+function findCompatibleVariant(nodeId, targetAlgo, state) {
+  const vars = state.asset_variants[nodeId] || [];
+  const targetFamily = targetAlgo.toLowerCase().split('-')[0].split('_')[0].split('.')[0];
+  
+  const match = vars.find(v => {
+    const vFamily = v.algorithm.toLowerCase().split('-')[0].split('_')[0].split('.')[0];
+    if ((targetFamily.includes("mlkem") && vFamily.includes("mlkem")) ||
+        (targetFamily.includes("mldsa") && vFamily.includes("mldsa")) ||
+        (targetFamily.includes("dilithium") && vFamily.includes("dilithium")) ||
+        (targetFamily.includes("dilithium") && vFamily.includes("mldsa")) ||
+        (targetFamily.includes("mldsa") && vFamily.includes("dilithium"))) {
+      return true;
+    }
+    return targetFamily === vFamily;
+  });
+  
+  return match || (vars.length > 0 ? vars[0] : null);
+}
+
+async function migrateNode(targetId, targetAlgo) {
+  const session = driver.session();
+  try {
+    // 1. Load the current simulation state from Memgraph
+    const state = await loadStateFromDB(session);
+
+    // 2. Resolve the target node in Memgraph
+    let query = "";
+    let params = {};
+    if (/^\d+$/.test(targetId)) {
+      query = "MATCH (n) WHERE id(n) = $id OR n.id = $idStr RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status";
+      params = { id: neo4j.int(targetId), idStr: targetId };
+    } else {
+      query = "MATCH (n) WHERE n.id = $id RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status";
+      params = { id: targetId };
+    }
+    
+    const res = await session.run(query, params);
+    if (res.records.length === 0) {
+      console.error(`[-] Error: Node with ID or name '${targetId}' not found in the database.`);
+      return false;
+    }
+
+    const record = res.records[0];
+    const dbId = record.get('db_id');
+    const nodeId = record.get('node_id');
+    const nodeType = record.get('type');
+
+    if (nodeType !== 'CryptoAsset' && nodeType !== 'SecurityControl') {
+      console.error(`[-] Error: Node '${nodeId}' is a '${nodeType}' and cannot be migrated.`);
+      return false;
+    }
+
+    // 3. Find the target variant properties (if it's a CryptoAsset)
+    let targetVariant = null;
+    if (nodeType === 'CryptoAsset') {
+      const vars = state.asset_variants[nodeId] || [];
+      targetVariant = vars.find(
+        v => v.algorithm.toLowerCase() === targetAlgo.toLowerCase() || 
+             v.variant_id.toLowerCase() === targetAlgo.toLowerCase()
+      );
+      if (!targetVariant) {
+        const available = vars.map(v => `${v.algorithm} (${v.variant_id})`).join(', ');
+        console.error(`[-] Error: Target algorithm/variant '${targetAlgo}' not available for asset '${nodeId}'.`);
+        console.error(`Available variants: [${available || 'none'}]`);
+        return false;
+      }
+    }
+
+    // 4. Query next step number
+    const stepRes = await session.run("MATCH (s:MigrationStep) RETURN max(s.step) as max_step");
+    const maxStepVal = stepRes.records[0].get('max_step');
+    let stepNum = 1;
+    if (maxStepVal !== null && maxStepVal !== undefined) {
+      stepNum = (maxStepVal.toNumber ? maxStepVal.toNumber() : Number(maxStepVal)) + 1;
+    }
+
+    // Find the strongly connected component (SCC) cluster containing nodeId
+    let sccs = computeSCCs(Array.from(state.nodes), Array.from(state.E_known));
+    let nodeCluster = sccs.find(scc => scc.includes(nodeId)) || [nodeId];
+    // Filter to only include nodes that are not yet migrated
+    let clusterToMigrate = nodeCluster.filter(n => !state.S_nodes.has(n));
+
+    // 5. Simulate the co-migration step state
+    const proposedMigrated = new Set([...state.S_nodes, ...clusterToMigrate]);
+    const proposedVariants = { ...state.active_variants };
+
+    clusterToMigrate.forEach(n => {
+      if (n === nodeId) {
+        if (nodeType === 'CryptoAsset') {
+          proposedVariants[n] = targetVariant;
+        } else {
+          proposedVariants[n] = {
+            algorithm: targetAlgo,
+            variant_id: targetAlgo,
+            security_level: 0,
+            key_size_bytes: 0,
+            performance: "unknown"
+          };
+        }
+      } else {
+        const isAsset = (state.asset_variants[n] && state.asset_variants[n].length > 0);
+        if (isAsset) {
+          proposedVariants[n] = findCompatibleVariant(n, targetAlgo, state);
+        } else {
+          proposedVariants[n] = {
+            algorithm: targetAlgo,
+            variant_id: targetAlgo,
+            security_level: 0,
+            key_size_bytes: 0,
+            performance: "unknown"
+          };
+        }
+      }
+    });
+
+    // 6. Perform validation check
+    const valResult = checkOracleValidation(proposedMigrated, proposedVariants, state);
+
+    if (valResult.success) {
+      // SUCCESS path
+      
+      // A. Mutate state in Memgraph database for all nodes in the co-migration cluster
+      for (const node of clusterToMigrate) {
+        const varSelected = proposedVariants[node];
+        const algoName = varSelected ? varSelected.algorithm : 'Post-Quantum';
+        await session.run(`
+          MATCH (n) WHERE n.id = $nodeId
+          SET n.status = 'migrated', n.migrated_at_step = $step, n.active_algorithm = $algo
+        `, { nodeId: node, step: stepNum, algo: algoName });
+      }
+
+      // B. Generate Ansible playbook mapping all nodes in the cluster
+      const playbook = generatePlaybookContent(clusterToMigrate, stepNum, proposedVariants);
+
+      // C. Save files
+      const files = savePlaybookAndLog(stepNum, true, "migrate_success", valResult.logs, playbook);
+
+      // D. Create step node in DB
+      const dbVariants = {};
+      clusterToMigrate.forEach(n => {
+        dbVariants[n] = proposedVariants[n];
+      });
+
+      await session.run(`
+        CREATE (s:MigrationStep {
+          id: $id, 
+          step: $step, 
+          timestamp: timestamp(), 
+          status: 'success', 
+          action: 'migrate_success',
+          cluster: $cluster,
+          logs: $logs,
+          ansible: $ansible,
+          variants: $variants,
+          log_file: $log_file
+        })
+      `, {
+        id: `Step_${stepNum}`,
+        step: stepNum,
+        cluster: Array.from(clusterToMigrate),
+        logs: JSON.stringify(valResult.logs),
+        ansible: playbook,
+        variants: JSON.stringify(dbVariants),
+        log_file: files.logFile
+      });
+
+      if (stepNum > 1) {
+        await session.run(`
+          MATCH (s_prev:MigrationStep {step: $prev})
+          MATCH (s_curr:MigrationStep {step: $curr})
+          CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
+        `, { prev: stepNum - 1, curr: stepNum });
+      }
+
+      console.log(`\n\x1b[32m[+] MIGRATION STEP ${stepNum} SUCCESSFUL!\x1b[0m`);
+      valResult.logs.forEach(l => console.log("  " + l));
+      console.log(`\nPlaybook saved to: \x1b[33m${files.playbookFile}\x1b[0m`);
+      console.log(`Logs written to:    \x1b[33m${files.logFile}\x1b[0m\n`);
+      return true;
+    } else {
+      // FAILURE path
+      const actionType = valResult.isStructural ? "migrate_fail" : "aborted_by_policy";
+      let foundEdge = null;
+
+      if (valResult.isStructural) {
+        // Find implicit dependency for any node in the cluster
+        let V_minus_Ci = Array.from(state.nodes).filter(n => !clusterToMigrate.includes(n));
+        let candidates = V_minus_Ci.filter(n => !state.S_nodes.has(n));
+        
+        for (const u of clusterToMigrate) {
+          for (const v of candidates) {
+            if (state.E_implicit.has(`${u}->${v}`) || state.E_implicit.has(`${v}->${u}`)) {
+              foundEdge = `${u}->${v}`;
+              // Write newly discovered implicit link to database
+              await session.run(`
+                MATCH (src {id: $u})
+                MATCH (tgt {id: $v})
+                CREATE (src)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(tgt)
+                CREATE (tgt)-[:IMPLICIT_DEPENDENCY {discovered: true, detected_at_step: $step}]->(src)
+              `, { u, v, step: stepNum });
+              break;
+            }
+          }
+          if (foundEdge) break;
+        }
+      }
+
+      // Save files
+      const files = savePlaybookAndLog(stepNum, false, actionType, valResult.logs);
+
+      // Create failed/aborted MigrationStep node in DB
+      await session.run(`
+        CREATE (s:MigrationStep {
+          id: $id, 
+          step: $step, 
+          timestamp: timestamp(), 
+          status: $status, 
+          action: $action,
+          cluster: $cluster,
+          logs: $logs,
+          discovered_edge: $discovered_edge,
+          log_file: $log_file
+        })
+      `, {
+        id: `Step_${stepNum}`,
+        step: stepNum,
+        status: valResult.isStructural ? 'failed' : 'aborted',
+        action: actionType,
+        cluster: Array.from(clusterToMigrate),
+        logs: JSON.stringify(valResult.logs),
+        discovered_edge: foundEdge,
+        log_file: files.logFile
+      });
+
+      console.log(`\n\x1b[31m[-] MIGRATION STEP ${stepNum} FAILED!\x1b[0m`);
+      valResult.logs.forEach(l => console.log("  " + l));
+      console.log(`\nLogs written to: \x1b[33m${files.logFile}\x1b[0m\n`);
+      return false;
+    }
+  } catch (err) {
+    console.error("[-] Error during migration: ", err.message);
+    return false;
+  } finally {
+    await session.close();
+  }
+}
+
+// MAIN CLI PARSING
+const args = process.argv.slice(2);
+if (args.length === 0) {
+  printUsage();
+  process.exit(1);
+}
+
+const command = args[0];
+if (command === 'show' && args[1] === 'system') {
+  showSystem().then(() => process.exit(0));
+} else if (command === 'migrate') {
+  let idArg = args.find(a => a.startsWith('id='));
+  let targetAlgo = args.filter(a => !a.startsWith('id=') && a !== 'migrate')[0];
+  
+  if (!idArg || !targetAlgo) {
+    console.error("[-] Error: Missing id or target algorithm parameters.");
+    printUsage();
+    process.exit(1);
+  }
+  
+  let targetId = idArg.split('=')[1];
+  migrateNode(targetId, targetAlgo).then(success => {
+    process.exit(success ? 0 : 1);
+  });
+} else {
+  printUsage();
+  process.exit(1);
+}
