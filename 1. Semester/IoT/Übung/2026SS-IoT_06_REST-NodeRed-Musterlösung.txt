@@ -1,0 +1,2310 @@
+[
+    {
+        "id": "207509bf7b23aa36",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "843cd578a5ef969e",
+        "type": "tab",
+        "label": "Flow 2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "b83cfa5704454b4e",
+        "type": "mqtt-broker",
+        "name": "mosquitto.local.cs.hs-rm.de",
+        "broker": "mosquitto.local.cs.hs-rm.de",
+        "port": "8883",
+        "tls": "",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "c0b13aba5f92aea5",
+        "type": "mqtt-broker",
+        "name": "",
+        "broker": "public.cloud.shiftr.io",
+        "port": 1883,
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "5256066704de9020",
+        "type": "ui-base",
+        "name": "My Dashboard",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "b2a60e920cd878bf",
+        "type": "ui-theme",
+        "name": "Default Theme",
+        "colors": {
+            "surface": "#ffffff",
+            "primary": "#0094CE",
+            "bgPage": "#eeeeee",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "4px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "c7e41ba0b3d91584",
+        "type": "ui-page",
+        "name": "Page 1",
+        "ui": "5256066704de9020",
+        "path": "/page1",
+        "icon": "home",
+        "layout": "grid",
+        "theme": "b2a60e920cd878bf",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": 0,
+                "cols": 3
+            },
+            {
+                "name": "Tablet",
+                "px": 576,
+                "cols": 6
+            },
+            {
+                "name": "Small Desktop",
+                "px": 768,
+                "cols": 9
+            },
+            {
+                "name": "Desktop",
+                "px": 1024,
+                "cols": 12
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "81b1c93958ae3c13",
+        "type": "ui-group",
+        "name": "Group 1",
+        "page": "c7e41ba0b3d91584",
+        "width": 6,
+        "height": 1,
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": true,
+        "disabled": false,
+        "groupType": "default"
+    },
+    {
+        "id": "a411bb0fd8b7e656",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 20",
+        "info": "",
+        "x": 430,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "5bc653a80a45408e",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.20/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 80,
+        "wires": [
+            [
+                "5bf2ced00a7ff540",
+                "55e3525907b65bb9",
+                "3621a11d4ad8fe83",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "444c9ad8783da9a8",
+        "type": "inject",
+        "z": "207509bf7b23aa36",
+        "name": "Every 5s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "5",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 160,
+        "y": 480,
+        "wires": [
+            [
+                "5bc653a80a45408e",
+                "64f2229a1492dc26",
+                "7525c3dad1fbcd92",
+                "3145652aedc27a9e",
+                "73aa91deece5b484",
+                "2da1f92719ea6baa"
+            ]
+        ]
+    },
+    {
+        "id": "5bf2ced00a7ff540",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "c1d056f398e2f127",
+        "type": "join",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "payload",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "2",
+        "count": "",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "num",
+        "reduceFixup": "",
+        "x": 1050,
+        "y": 560,
+        "wires": [
+            [
+                "27c2f7c041b0a052",
+                "9d7cc331938b1144"
+            ]
+        ]
+    },
+    {
+        "id": "27c2f7c041b0a052",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Join 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1090,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "9d7cc331938b1144",
+        "type": "calculator",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "inputMsgField": "payload",
+        "outputMsgField": "payload",
+        "operation": "sum",
+        "constant": "",
+        "round": false,
+        "truncate": false,
+        "decimals": 0,
+        "decimals2": 0,
+        "x": 1300,
+        "y": 560,
+        "wires": [
+            [
+                "9c06daf1ffed0f0e"
+            ]
+        ]
+    },
+    {
+        "id": "9c06daf1ffed0f0e",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 10",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1360,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "73812fae1c9bcfe8",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 21",
+        "info": "",
+        "x": 430,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "64f2229a1492dc26",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.21/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 240,
+        "wires": [
+            [
+                "352122068f2644b8",
+                "f8749b118f36439b",
+                "8fa4331c3d63bbb6",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "352122068f2644b8",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "c363ff1590b062d1",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 22",
+        "info": "",
+        "x": 430,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "7525c3dad1fbcd92",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.22/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 400,
+        "wires": [
+            [
+                "b1cc3d507ea78715",
+                "aa4199041f00151c",
+                "d7db1c165dea8268",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "b1cc3d507ea78715",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "060b0e4f2419e609",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 23",
+        "info": "",
+        "x": 430,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "3145652aedc27a9e",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.23/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 560,
+        "wires": [
+            [
+                "16e8fc783bc53912",
+                "7138b17adc2dcb5e",
+                "5786131fdaec3d75",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "16e8fc783bc53912",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "97c940601a14ded5",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 24",
+        "info": "",
+        "x": 430,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "73aa91deece5b484",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.24/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 720,
+        "wires": [
+            [
+                "b940a9424c2cb3ca",
+                "b91a2449e67f9e4f",
+                "480e3fddb2f63bac",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "b940a9424c2cb3ca",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "4888b6596e808a5f",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 25",
+        "info": "",
+        "x": 430,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "2da1f92719ea6baa",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.25/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 430,
+        "y": 880,
+        "wires": [
+            [
+                "e678eef281377c85",
+                "4ab0f95c20e27092",
+                "f7c5b3760077f832",
+                "f6b4a336afb19405"
+            ]
+        ]
+    },
+    {
+        "id": "e678eef281377c85",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 500,
+        "y": 920,
+        "wires": []
+    },
+    {
+        "id": "55e3525907b65bb9",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 60,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "de8484564818ffe7"
+            ]
+        ]
+    },
+    {
+        "id": "3621a11d4ad8fe83",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 140,
+        "wires": [
+            [
+                "4f78e530f0ee8972",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "f8749b118f36439b",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 220,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "94acb0adcc7d7948"
+            ]
+        ]
+    },
+    {
+        "id": "8fa4331c3d63bbb6",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 300,
+        "wires": [
+            [
+                "94baf31aea8db3d6",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "aa4199041f00151c",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 380,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "710339e0c585a1a1"
+            ]
+        ]
+    },
+    {
+        "id": "d7db1c165dea8268",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 460,
+        "wires": [
+            [
+                "4e0b9544cf46728e",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "7138b17adc2dcb5e",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 540,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "6f41d68339e68884"
+            ]
+        ]
+    },
+    {
+        "id": "5786131fdaec3d75",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 620,
+        "wires": [
+            [
+                "e66b95c41eea8eb3",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "b91a2449e67f9e4f",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 700,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "95d71fad5032db88"
+            ]
+        ]
+    },
+    {
+        "id": "480e3fddb2f63bac",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 780,
+        "wires": [
+            [
+                "f3374649cca5564a",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "4ab0f95c20e27092",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 720,
+        "y": 860,
+        "wires": [
+            [
+                "c1d056f398e2f127",
+                "d355e330ba32c6f1"
+            ]
+        ]
+    },
+    {
+        "id": "f7c5b3760077f832",
+        "type": "change",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "rules": [
+            {
+                "t": "move",
+                "p": "msg.payload.StatusSNS.ENERGY.Power",
+                "pt": "msg",
+                "to": "payload",
+                "tot": "msg"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 690,
+        "y": 940,
+        "wires": [
+            [
+                "5907d3a656707828",
+                "fdc766d52aa0ec56"
+            ]
+        ]
+    },
+    {
+        "id": "de8484564818ffe7",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 9",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "4f78e530f0ee8972",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 11",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "94acb0adcc7d7948",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 12",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "94baf31aea8db3d6",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 13",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 340,
+        "wires": []
+    },
+    {
+        "id": "710339e0c585a1a1",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 14",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 420,
+        "wires": []
+    },
+    {
+        "id": "4e0b9544cf46728e",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 15",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 500,
+        "wires": []
+    },
+    {
+        "id": "6f41d68339e68884",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 16",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 580,
+        "wires": []
+    },
+    {
+        "id": "e66b95c41eea8eb3",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 17",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "95d71fad5032db88",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 18",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 740,
+        "wires": []
+    },
+    {
+        "id": "f3374649cca5564a",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 19",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 820,
+        "wires": []
+    },
+    {
+        "id": "d355e330ba32c6f1",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 20",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 900,
+        "wires": []
+    },
+    {
+        "id": "5907d3a656707828",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 21",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 780,
+        "y": 980,
+        "wires": []
+    },
+    {
+        "id": "fdc766d52aa0ec56",
+        "type": "join",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "payload",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "2",
+        "count": "",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "num",
+        "reduceFixup": "",
+        "x": 1050,
+        "y": 740,
+        "wires": [
+            [
+                "c2470998006790ec",
+                "224a53b7d78fbd73"
+            ]
+        ]
+    },
+    {
+        "id": "c2470998006790ec",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Join 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1090,
+        "y": 780,
+        "wires": []
+    },
+    {
+        "id": "224a53b7d78fbd73",
+        "type": "calculator",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "inputMsgField": "payload",
+        "outputMsgField": "payload",
+        "operation": "sum",
+        "constant": "",
+        "round": false,
+        "truncate": false,
+        "decimals": 0,
+        "decimals2": 0,
+        "x": 1270,
+        "y": 740,
+        "wires": [
+            [
+                "3b0264c0808d0e1c"
+            ]
+        ]
+    },
+    {
+        "id": "3b0264c0808d0e1c",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 22",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1360,
+        "y": 780,
+        "wires": []
+    },
+    {
+        "id": "f6b4a336afb19405",
+        "type": "join",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "2",
+        "count": "",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "num",
+        "reduceFixup": "",
+        "x": 1050,
+        "y": 240,
+        "wires": [
+            [
+                "92e76f3eab810315",
+                "90f1268674b081a7"
+            ]
+        ]
+    },
+    {
+        "id": "92e76f3eab810315",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Join 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload.StatusSNS.ENERGY.ApparentPower",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1090,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "90f1268674b081a7",
+        "type": "calculator",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "inputMsgField": "payload",
+        "outputMsgField": "payload",
+        "operation": "sum",
+        "constant": "",
+        "round": false,
+        "truncate": false,
+        "decimals": 0,
+        "decimals2": 0,
+        "x": 1300,
+        "y": 240,
+        "wires": [
+            [
+                "ac2cbf02a47227ed"
+            ]
+        ]
+    },
+    {
+        "id": "ac2cbf02a47227ed",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 23",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1360,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "50ea6e76e8ca6cdf",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 20",
+        "info": "",
+        "x": 470,
+        "y": 1220,
+        "wires": []
+    },
+    {
+        "id": "d55dc66a2562f5a1",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.20/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 1260,
+        "wires": [
+            [
+                "a42b80d7ee69dd3d",
+                "f1091cbdc9e1a7b8",
+                "b37aa16bda468b7e",
+                "a074934c4728b0e1"
+            ]
+        ]
+    },
+    {
+        "id": "71a40981e616e3fc",
+        "type": "inject",
+        "z": "207509bf7b23aa36",
+        "name": "Every 5s",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "5",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 200,
+        "y": 1660,
+        "wires": [
+            [
+                "d55dc66a2562f5a1",
+                "c9ddd0300ba31a4b",
+                "f3472d5943225e6e",
+                "c49ac1d0af6c6f52",
+                "64301f466944c1bc",
+                "81c9ce965defc190"
+            ]
+        ]
+    },
+    {
+        "id": "a42b80d7ee69dd3d",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 1300,
+        "wires": []
+    },
+    {
+        "id": "7db7402d2375c4b1",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 21",
+        "info": "",
+        "x": 470,
+        "y": 1380,
+        "wires": []
+    },
+    {
+        "id": "c9ddd0300ba31a4b",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.21/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 1420,
+        "wires": [
+            [
+                "fbf8d72d9c4704f9",
+                "f1091cbdc9e1a7b8",
+                "b37aa16bda468b7e",
+                "e6e73b139c04deb8"
+            ]
+        ]
+    },
+    {
+        "id": "fbf8d72d9c4704f9",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 1460,
+        "wires": []
+    },
+    {
+        "id": "b984ff104ce2283c",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 22",
+        "info": "",
+        "x": 470,
+        "y": 1540,
+        "wires": []
+    },
+    {
+        "id": "f3472d5943225e6e",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.22/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 1580,
+        "wires": [
+            [
+                "94afb23844c46cce",
+                "f1091cbdc9e1a7b8",
+                "b37aa16bda468b7e",
+                "8570ade6037451a3"
+            ]
+        ]
+    },
+    {
+        "id": "94afb23844c46cce",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 1620,
+        "wires": []
+    },
+    {
+        "id": "209652427d42a754",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 23",
+        "info": "",
+        "x": 470,
+        "y": 1700,
+        "wires": []
+    },
+    {
+        "id": "c49ac1d0af6c6f52",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.23/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 1740,
+        "wires": [
+            [
+                "df6c0fe8cf9f1140",
+                "b37aa16bda468b7e",
+                "f1091cbdc9e1a7b8",
+                "98fb5fa4f8d81eed"
+            ]
+        ]
+    },
+    {
+        "id": "df6c0fe8cf9f1140",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 1780,
+        "wires": []
+    },
+    {
+        "id": "d1367721de0a10f4",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 24",
+        "info": "",
+        "x": 470,
+        "y": 1860,
+        "wires": []
+    },
+    {
+        "id": "64301f466944c1bc",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.24/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 1900,
+        "wires": [
+            [
+                "8f41b9d4e74c3094",
+                "b37aa16bda468b7e",
+                "f1091cbdc9e1a7b8",
+                "e6f4e57ba74fa970"
+            ]
+        ]
+    },
+    {
+        "id": "8f41b9d4e74c3094",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 1940,
+        "wires": []
+    },
+    {
+        "id": "58ad648a94b9a29e",
+        "type": "comment",
+        "z": "207509bf7b23aa36",
+        "name": "Steckdose 25",
+        "info": "",
+        "x": 470,
+        "y": 2020,
+        "wires": []
+    },
+    {
+        "id": "81c9ce965defc190",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.25/cm?cmnd=Status 8",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 470,
+        "y": 2060,
+        "wires": [
+            [
+                "a476d70cdf508643",
+                "3debf381aa9ab96a"
+            ]
+        ]
+    },
+    {
+        "id": "a476d70cdf508643",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Complete Msg",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "true",
+        "targetType": "full",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 2100,
+        "wires": []
+    },
+    {
+        "id": "f1091cbdc9e1a7b8",
+        "type": "join",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "msg.payload.StatusSNS.ENERGY.ApparentPower",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "2",
+        "count": "",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "num",
+        "reduceFixup": "",
+        "x": 890,
+        "y": 1580,
+        "wires": [
+            [
+                "229a254f01627b09",
+                "d14168aee5309130"
+            ]
+        ]
+    },
+    {
+        "id": "229a254f01627b09",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Join 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload.StatusSNS.ENERGY.ApparentPower",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 930,
+        "y": 1620,
+        "wires": []
+    },
+    {
+        "id": "d14168aee5309130",
+        "type": "calculator",
+        "z": "207509bf7b23aa36",
+        "name": "ApparentPower",
+        "inputMsgField": "payload.StatusSNS.ENERGY.ApparentPower",
+        "outputMsgField": "payload",
+        "operation": "sum",
+        "constant": "",
+        "round": false,
+        "truncate": false,
+        "decimals": 0,
+        "decimals2": 0,
+        "x": 1140,
+        "y": 1580,
+        "wires": [
+            [
+                "d24a91184c5aa51f",
+                "7b68a01eb430b956",
+                "c13e07b3aedfdb11"
+            ]
+        ]
+    },
+    {
+        "id": "d24a91184c5aa51f",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 24",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 1620,
+        "wires": []
+    },
+    {
+        "id": "b37aa16bda468b7e",
+        "type": "join",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "mode": "custom",
+        "build": "array",
+        "property": "msg.payload.StatusSNS.ENERGY.Power",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "\\n",
+        "joinerType": "str",
+        "useparts": false,
+        "accumulate": false,
+        "timeout": "2",
+        "count": "",
+        "reduceRight": false,
+        "reduceExp": "",
+        "reduceInit": "",
+        "reduceInitType": "num",
+        "reduceFixup": "",
+        "x": 890,
+        "y": 1800,
+        "wires": [
+            [
+                "b04db32d0326dfbe",
+                "5adc652c428dc194"
+            ]
+        ]
+    },
+    {
+        "id": "b04db32d0326dfbe",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "Join 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload.StatusSNS.ENERGY.Power",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 930,
+        "y": 1840,
+        "wires": []
+    },
+    {
+        "id": "5adc652c428dc194",
+        "type": "calculator",
+        "z": "207509bf7b23aa36",
+        "name": "Power",
+        "inputMsgField": "payload.StatusSNS.ENERGY.Power",
+        "outputMsgField": "payload",
+        "operation": "sum",
+        "constant": "",
+        "round": false,
+        "truncate": false,
+        "decimals": 0,
+        "decimals2": 0,
+        "x": 1110,
+        "y": 1800,
+        "wires": [
+            [
+                "8422f95f071987ad",
+                "b0dce9e016425f1a"
+            ]
+        ]
+    },
+    {
+        "id": "8422f95f071987ad",
+        "type": "debug",
+        "z": "207509bf7b23aa36",
+        "name": "debug 25",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 1200,
+        "y": 1840,
+        "wires": []
+    },
+    {
+        "id": "b0dce9e016425f1a",
+        "type": "switch",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "lte",
+                "v": "2",
+                "vt": "str"
+            },
+            {
+                "t": "gte",
+                "v": "3",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 1410,
+        "y": 1800,
+        "wires": [
+            [
+                "bb2154a33dd549e5"
+            ],
+            [
+                "6993a12b14d8977f"
+            ]
+        ]
+    },
+    {
+        "id": "bb2154a33dd549e5",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.25/cm?cmnd=Power OFF",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1590,
+        "y": 1780,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "6993a12b14d8977f",
+        "type": "http request",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.25/cm?cmnd=Power ON",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 1590,
+        "y": 1820,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "a074934c4728b0e1",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 6,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 20",
+        "label": "Steckdose 20",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 1220,
+        "wires": []
+    },
+    {
+        "id": "e6e73b139c04deb8",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 1,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 21",
+        "label": "Steckdose 21",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 1380,
+        "wires": []
+    },
+    {
+        "id": "8570ade6037451a3",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 2,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 22",
+        "label": "Steckdose 22",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 1560,
+        "wires": []
+    },
+    {
+        "id": "98fb5fa4f8d81eed",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 5,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 23",
+        "label": "Steckdose 23",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 1720,
+        "wires": []
+    },
+    {
+        "id": "e6f4e57ba74fa970",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 4,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 24",
+        "label": "Steckdose 24",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 1880,
+        "wires": []
+    },
+    {
+        "id": "3debf381aa9ab96a",
+        "type": "ui-text",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "order": 3,
+        "width": "3",
+        "height": "1",
+        "name": "Steckdose 25",
+        "label": "Steckdose 25",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload.StatusSNS.ENERGY.Power",
+        "valueType": "msg",
+        "x": 660,
+        "y": 2040,
+        "wires": []
+    },
+    {
+        "id": "7b68a01eb430b956",
+        "type": "ui-chart",
+        "z": "207509bf7b23aa36",
+        "group": "81b1c93958ae3c13",
+        "name": "",
+        "label": "chart",
+        "order": 7,
+        "chartType": "line",
+        "category": "topic",
+        "categoryType": "msg",
+        "xAxisLabel": "",
+        "xAxisProperty": "",
+        "xAxisPropertyType": "timestamp",
+        "xAxisType": "time",
+        "xAxisFormat": "",
+        "xAxisFormatType": "auto",
+        "xmin": "",
+        "xmax": "",
+        "yAxisLabel": "",
+        "yAxisProperty": "payload",
+        "yAxisPropertyType": "msg",
+        "ymin": "",
+        "ymax": "",
+        "bins": 10,
+        "action": "append",
+        "stackSeries": false,
+        "pointShape": "circle",
+        "pointRadius": 4,
+        "showLegend": true,
+        "removeOlder": 1,
+        "removeOlderUnit": "3600",
+        "removeOlderPoints": "",
+        "colors": [
+            "#0095ff",
+            "#ff0000",
+            "#ff7f0e",
+            "#2ca02c",
+            "#a347e1",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "textColor": [
+            "#666666"
+        ],
+        "textColorDefault": true,
+        "gridColor": [
+            "#e5e5e5"
+        ],
+        "gridColorDefault": true,
+        "width": 6,
+        "height": 8,
+        "className": "",
+        "interpolation": "linear",
+        "x": 1390,
+        "y": 1540,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c13e07b3aedfdb11",
+        "type": "ui-gauge",
+        "z": "207509bf7b23aa36",
+        "name": "",
+        "group": "81b1c93958ae3c13",
+        "order": 0,
+        "value": "payload",
+        "valueType": "msg",
+        "width": 3,
+        "height": 3,
+        "gtype": "gauge-half",
+        "gstyle": "needle",
+        "title": "Energy Consumption",
+        "alwaysShowTitle": false,
+        "floatingTitlePosition": "top-left",
+        "units": "Watt",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "0",
+                "color": "#5cd65c",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "10",
+                "color": "#ffc800",
+                "text": "",
+                "textType": "label"
+            },
+            {
+                "from": "20",
+                "color": "#ea5353",
+                "text": "",
+                "textType": "label"
+            }
+        ],
+        "min": 0,
+        "max": "25",
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "x": 1440,
+        "y": 1640,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9d150aaf221eb216",
+        "type": "mqtt in",
+        "z": "843cd578a5ef969e",
+        "name": "MQTT HSRM All",
+        "topic": "StudentRoomData",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "b83cfa5704454b4e",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 240,
+        "y": 200,
+        "wires": [
+            [
+                "b8f044763c7c9d2e"
+            ]
+        ]
+    },
+    {
+        "id": "b8f044763c7c9d2e",
+        "type": "debug",
+        "z": "843cd578a5ef969e",
+        "name": "debug 1",
+        "active": true,
+        "tosidebar": true,
+        "console": true,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 450,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "5a7a6dfa8eb66a6c",
+        "type": "mqtt in",
+        "z": "843cd578a5ef969e",
+        "name": "",
+        "topic": "ahoy.tb.1971/Kegel/ch1/YieldTotal",
+        "qos": "2",
+        "datatype": "auto-detect",
+        "broker": "c0b13aba5f92aea5",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 290,
+        "y": 280,
+        "wires": [
+            [
+                "be1d682d46934653",
+                "8d541943b753af42"
+            ]
+        ]
+    },
+    {
+        "id": "be1d682d46934653",
+        "type": "debug",
+        "z": "843cd578a5ef969e",
+        "name": "debug 2",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 540,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "8d541943b753af42",
+        "type": "switch",
+        "z": "843cd578a5ef969e",
+        "name": "",
+        "property": "payload",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "gt",
+                "v": "900",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 1,
+        "x": 550,
+        "y": 360,
+        "wires": [
+            [
+                "8e6abacc731f0d03"
+            ]
+        ]
+    },
+    {
+        "id": "8e6abacc731f0d03",
+        "type": "http request",
+        "z": "843cd578a5ef969e",
+        "name": "",
+        "method": "GET",
+        "ret": "txt",
+        "paytoqs": "ignore",
+        "url": "http://10.18.210.35/cm=cmnd?Power ON",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 730,
+        "y": 360,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cf83867112af9afb",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "@flowfuse/node-red-dashboard": "1.30.2",
+            "node-red-contrib-calc": "1.0.6"
+        }
+    }
+]
