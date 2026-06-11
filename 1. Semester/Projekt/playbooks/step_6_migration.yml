@@ -1,4 +1,4 @@
-- name: PQC Migration Step 3
+- name: PQC Migration Step 6
   hosts: localhost
   gather_facts: false
   vars:
@@ -13,7 +13,7 @@
           # Node: Webserver_Classic.TLS_1.2_/_1.3_Communication -> Algorithm:
           TLS1.3 (NIST Security Level: 0, Key Size: 0 bytes, Performance:
           UNKNOWN)
-        dest: /etc/pqc/keys_step_3.conf
+        dest: /etc/pqc/keys_step_6.conf
     - name: Restart Migrated Services & Modules
       ansible.builtin.systemd:
         name: pqc_crypto_daemon

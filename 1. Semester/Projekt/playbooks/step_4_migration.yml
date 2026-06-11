@@ -3,16 +3,15 @@
   gather_facts: false
   vars:
     migrated_nodes:
-      - Webserver_Classic.TLS_1.2_/_1.3_Communication
+      - Webserver_Classic.Cert_RSA2048
   tasks:
     - name: Deploy Post-Quantum Cryptographic Assets & Keys
       ansible.builtin.copy:
         content: >
           # PQC Migrated Keys and Algorithms
 
-          # Node: Webserver_Classic.TLS_1.2_/_1.3_Communication -> Algorithm:
-          TLS1.3 (NIST Security Level: 0, Key Size: 0 bytes, Performance:
-          UNKNOWN)
+          # Node: Webserver_Classic.Cert_RSA2048 -> Algorithm: ML-DSA-44 (NIST
+          Security Level: 1, Key Size: 1312 bytes, Performance: HIGH)
         dest: /etc/pqc/keys_step_4.conf
     - name: Restart Migrated Services & Modules
       ansible.builtin.systemd:

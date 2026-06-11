@@ -2,12 +2,16 @@
   hosts: localhost
   gather_facts: false
   vars:
-    migrated_nodes: []
+    migrated_nodes:
+      - Webserver_Classic.Cert_RSA2048
   tasks:
     - name: Deploy Post-Quantum Cryptographic Assets & Keys
       ansible.builtin.copy:
-        content: |
+        content: >
           # PQC Migrated Keys and Algorithms
+
+          # Node: Webserver_Classic.Cert_RSA2048 -> Algorithm: ML-DSA-65 (NIST
+          Security Level: 3, Key Size: 1952 bytes, Performance: MEDIUM)
         dest: /etc/pqc/keys_step_5.conf
     - name: Restart Migrated Services & Modules
       ansible.builtin.systemd:

@@ -22,6 +22,7 @@ function printUsage() {
 
 Usage:
   cryme show system                        Inspect the status of all components and cryptographic assets.
+  cryme show tree                          Display the PQC migration steps as an ASCII tree.
   cryme migrate id=<id_or_name> <algo>    Migrate an asset or security control to a target algorithm/variant.
 
 Examples:
@@ -86,6 +87,90 @@ async function showSystem() {
   }
 }
 
+// Fetch and print the migration tree as an ASCII art
+async function showTree() {
+  const session = driver.session();
+  try {
+    const nodeRes = await session.run("MATCH (s:MigrationStep) RETURN s.step as step, s.status as status, s.action as action, s.cluster as cluster, s.variants as variants ORDER BY s.step ASC");
+    const edgeRes = await session.run("MATCH (a:MigrationStep)-[:TRANSITION_TO]->(b:MigrationStep) RETURN a.step as parent, b.step as child");
+    
+    const nodes = {};
+    nodeRes.records.forEach(r => {
+      let stVal = r.get('step');
+      let stepNum = stVal.toNumber ? stVal.toNumber() : Number(stVal);
+      let actionText = r.get('action') || '';
+      const cluster = r.get('cluster') || [];
+      const variantsStr = r.get('variants');
+
+      if (actionText === 'migrate_success' && cluster.length > 0 && variantsStr) {
+        try {
+          const variants = JSON.parse(variantsStr);
+          const algos = cluster.map(n => variants[n] ? variants[n].algorithm : 'PQC').join(', ');
+          actionText = `Migrated ${cluster.join(', ')} to ${algos}`;
+        } catch (e) {}
+      } else if (actionText === 'redundant_migration' && cluster.length > 0) {
+        actionText = `Redundant: ${cluster.join(', ')} already migrated`;
+      } else if (actionText === 'migrate_fail' && cluster.length > 0) {
+        actionText = `Failed to migrate ${cluster.join(', ')}`;
+      } else if (actionText === 'migrate_success' && cluster.length === 0) {
+        actionText = `Ghost Migration (No changes)`;
+      }
+
+      nodes[stepNum] = {
+        step: stepNum,
+        status: r.get('status'),
+        action: actionText,
+        children: []
+      };
+    });
+
+    const hasParent = new Set();
+    edgeRes.records.forEach(r => {
+      let pVal = r.get('parent');
+      let p = pVal.toNumber ? pVal.toNumber() : Number(pVal);
+      let cVal = r.get('child');
+      let c = cVal.toNumber ? cVal.toNumber() : Number(cVal);
+      
+      if (nodes[p] && nodes[c]) {
+        nodes[p].children.push(nodes[c]);
+        hasParent.add(c);
+      }
+    });
+
+    const roots = Object.values(nodes).filter(n => !hasParent.has(n.step));
+    
+    function printTree(node, prefix = '', isLast = true) {
+      let color = '\x1b[32m'; // success (green)
+      if (node.status === 'failed') color = '\x1b[31m'; // fail (red)
+      if (node.status === 'aborted') color = '\x1b[33m'; // aborted (yellow)
+      if (node.status === 'init') color = '\x1b[36m'; // init (cyan)
+      
+      const marker = isLast ? '└── ' : '├── ';
+      console.log(`${prefix}${marker}${color}[Step ${node.step}] ${node.status.toUpperCase()} (${node.action})\x1b[0m`);
+      
+      const newPrefix = prefix + (isLast ? '    ' : '│   ');
+      node.children.sort((a,b) => a.step - b.step);
+      for (let i = 0; i < node.children.length; i++) {
+        printTree(node.children[i], newPrefix, i === node.children.length - 1);
+      }
+    }
+
+    console.log("\\n🌲 PQC Migration Tree:");
+    if (roots.length === 0) {
+      console.log("  No migration steps found.\\n");
+    } else {
+      roots.sort((a,b) => a.step - b.step).forEach(root => {
+        printTree(root, '', true);
+      });
+      console.log("");
+    }
+  } catch (err) {
+    console.error("[-] Error showing tree: ", err.message);
+  } finally {
+    await session.close();
+  }
+}
+
 // Find compatible variant for another node in the cluster
 function findCompatibleVariant(nodeId, targetAlgo, state) {
   const vars = state.asset_variants[nodeId] || [];
@@ -116,10 +201,10 @@ async function migrateNode(targetId, targetAlgo) {
     let query = "";
     let params = {};
     if (/^\d+$/.test(targetId)) {
-      query = "MATCH (n) WHERE id(n) = $id OR n.id = $idStr RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status";
+      query = "MATCH (n) WHERE id(n) = $id OR n.id = $idStr RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo";
       params = { id: neo4j.int(targetId), idStr: targetId };
     } else {
-      query = "MATCH (n) WHERE n.id = $id RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status";
+      query = "MATCH (n) WHERE n.id = $id RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo";
       params = { id: targetId };
     }
     
@@ -141,6 +226,9 @@ async function migrateNode(targetId, targetAlgo) {
 
     // 3. Find the target variant properties (if it's a CryptoAsset)
     let targetVariant = null;
+    const activeAlgo = record.get('algo');
+    const nodeStatus = record.get('status');
+
     if (nodeType === 'CryptoAsset') {
       const vars = state.asset_variants[nodeId] || [];
       targetVariant = vars.find(
@@ -153,21 +241,80 @@ async function migrateNode(targetId, targetAlgo) {
         console.error(`Available variants: [${available || 'none'}]`);
         return false;
       }
+      
+    } else if (nodeType === 'SecurityControl') {
+      // Just check existence
     }
 
-    // 4. Query next step number
-    const stepRes = await session.run("MATCH (s:MigrationStep) RETURN max(s.step) as max_step");
-    const maxStepVal = stepRes.records[0].get('max_step');
+    // 4. Query next step number and find the previous successful step
+    const stepRes = await session.run("MATCH (s:MigrationStep) RETURN s.step as step, s.status as status");
     let stepNum = 1;
-    if (maxStepVal !== null && maxStepVal !== undefined) {
-      stepNum = (maxStepVal.toNumber ? maxStepVal.toNumber() : Number(maxStepVal)) + 1;
+    let prevStep = 0;
+    if (stepRes.records.length > 0) {
+      let maxStep = 0;
+      let lastSuccess = null;
+      stepRes.records.forEach(rec => {
+        let stVal = rec.get('step');
+        let s = (stVal.toNumber ? stVal.toNumber() : Number(stVal));
+        if (s > maxStep) maxStep = s;
+        if (rec.get('status') === 'success' && (!lastSuccess || s > lastSuccess)) {
+          lastSuccess = s;
+        }
+      });
+      stepNum = maxStep + 1;
+      prevStep = lastSuccess ? lastSuccess : 0;
+    }
+
+    // 5. Check if redundant migration, create dead-end leaf if so
+    let isRedundant = false;
+    let redundantAlgo = '';
+    if (nodeType === 'CryptoAsset' && nodeStatus === 'migrated' && activeAlgo && activeAlgo.toLowerCase() === targetVariant.algorithm.toLowerCase()) {
+      isRedundant = true;
+      redundantAlgo = targetVariant.algorithm;
+    } else if (nodeType === 'SecurityControl' && nodeStatus === 'migrated' && activeAlgo && activeAlgo.toLowerCase() === targetAlgo.toLowerCase()) {
+      isRedundant = true;
+      redundantAlgo = targetAlgo;
+    }
+
+    if (isRedundant) {
+      console.log(`[!] Info: Node '${nodeId}' is already migrated to '${redundantAlgo}'. No action needed.`);
+      await session.run(`
+        MERGE (init:MigrationStep {step: 0})
+        ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+        WITH init
+        CREATE (s:MigrationStep {
+          id: $id, 
+          step: $step, 
+          timestamp: timestamp(), 
+          status: 'aborted', 
+          action: $action,
+          cluster: $cluster,
+          logs: $logs,
+          log_file: $log_file
+        })
+        WITH s
+        OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+        WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+        FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+          CREATE (s_prev)-[:TRANSITION_TO]->(s)
+        )
+      `, {
+        id: `Step_${stepNum}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        step: stepNum,
+        action: 'redundant_migration',
+        cluster: [nodeId],
+        logs: JSON.stringify(["[!] Redundant migration: Asset is already migrated to the requested algorithm."]),
+        log_file: null,
+        prev: prevStep
+      });
+      return true;
     }
 
     // Find the strongly connected component (SCC) cluster containing nodeId
     let sccs = computeSCCs(Array.from(state.nodes), Array.from(state.E_known));
     let nodeCluster = sccs.find(scc => scc.includes(nodeId)) || [nodeId];
-    // Filter to only include nodes that are not yet migrated
-    let clusterToMigrate = nodeCluster.filter(n => !state.S_nodes.has(n));
+    // We do not filter out nodes from state.S_nodes here because we want to allow re-migrating an asset to a different variant
+    let clusterToMigrate = nodeCluster;
 
     // 5. Simulate the co-migration step state
     const proposedMigrated = new Set([...state.S_nodes, ...clusterToMigrate]);
@@ -231,6 +378,9 @@ async function migrateNode(targetId, targetAlgo) {
       });
 
       await session.run(`
+        MERGE (init:MigrationStep {step: 0})
+        ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+        WITH init
         CREATE (s:MigrationStep {
           id: $id, 
           step: $step, 
@@ -243,23 +393,22 @@ async function migrateNode(targetId, targetAlgo) {
           variants: $variants,
           log_file: $log_file
         })
+        WITH s
+        OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+        WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+        FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+          CREATE (s_prev)-[:TRANSITION_TO]->(s)
+        )
       `, {
-        id: `Step_${stepNum}`,
+        id: `Step_${stepNum}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         step: stepNum,
         cluster: Array.from(clusterToMigrate),
         logs: JSON.stringify(valResult.logs),
         ansible: playbook,
         variants: JSON.stringify(dbVariants),
-        log_file: files.logFile
+        log_file: files.logFile,
+        prev: prevStep
       });
-
-      if (stepNum > 1) {
-        await session.run(`
-          MATCH (s_prev:MigrationStep {step: $prev})
-          MATCH (s_curr:MigrationStep {step: $curr})
-          CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
-        `, { prev: stepNum - 1, curr: stepNum });
-      }
 
       console.log(`\n\x1b[32m[+] MIGRATION STEP ${stepNum} SUCCESSFUL!\x1b[0m`);
       valResult.logs.forEach(l => console.log("  " + l));
@@ -299,6 +448,9 @@ async function migrateNode(targetId, targetAlgo) {
 
       // Create failed/aborted MigrationStep node in DB
       await session.run(`
+        MERGE (init:MigrationStep {step: 0})
+        ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+        WITH init
         CREATE (s:MigrationStep {
           id: $id, 
           step: $step, 
@@ -310,15 +462,22 @@ async function migrateNode(targetId, targetAlgo) {
           discovered_edge: $discovered_edge,
           log_file: $log_file
         })
+        WITH s
+        OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+        WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+        FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+          CREATE (s_prev)-[:TRANSITION_TO]->(s)
+        )
       `, {
-        id: `Step_${stepNum}`,
+        id: `Step_${stepNum}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         step: stepNum,
         status: valResult.isStructural ? 'failed' : 'aborted',
         action: actionType,
         cluster: Array.from(clusterToMigrate),
         logs: JSON.stringify(valResult.logs),
         discovered_edge: foundEdge,
-        log_file: files.logFile
+        log_file: files.logFile,
+        prev: prevStep
       });
 
       console.log(`\n\x1b[31m[-] MIGRATION STEP ${stepNum} FAILED!\x1b[0m`);
@@ -344,6 +503,8 @@ if (args.length === 0) {
 const command = args[0];
 if (command === 'show' && args[1] === 'system') {
   showSystem().then(() => process.exit(0));
+} else if (command === 'show' && args[1] === 'tree') {
+  showTree().then(() => process.exit(0));
 } else if (command === 'migrate') {
   let idArg = args.find(a => a.startsWith('id='));
   let targetAlgo = args.filter(a => !a.startsWith('id=') && a !== 'migrate')[0];

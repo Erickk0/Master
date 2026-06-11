@@ -238,7 +238,19 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
 
     // B. Re-create MigrationStep nodes and transitions in Memgraph
     for (const h of savedHistory) {
+      let prevStep = 0;
+      for (let i = h.step - 1; i >= 1; i--) {
+        let prevH = savedHistory.find(x => x.step === i);
+        if (prevH && prevH.success) {
+          prevStep = i;
+          break;
+        }
+      }
+
       await session.run(`
+        MERGE (init:MigrationStep {step: 0})
+        ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+        WITH init
         CREATE (s:MigrationStep {
           id: $id, 
           step: $step, 
@@ -252,8 +264,14 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
           discovered_edge: $discovered_edge, 
           log_file: $log_file
         })
+        WITH s
+        OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+        WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+        FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+          CREATE (s_prev)-[:TRANSITION_TO]->(s)
+        )
       `, {
-        id: `Step_${h.step}`,
+        id: `Step_${h.step}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
         step: h.step,
         status: h.success ? 'success' : (h.action === 'aborted_by_policy' ? 'aborted' : 'failed'),
         action: h.action,
@@ -262,16 +280,9 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
         ansible: h.ansible || "",
         variants: JSON.stringify(h.variants || {}),
         discovered_edge: h.discovered_edge || null,
-        log_file: h.log_file || null
+        log_file: h.log_file || null,
+        prev: prevStep
       });
-
-      if (h.step > 1) {
-        await session.run(`
-          MATCH (s_prev:MigrationStep {step: $prev})
-          MATCH (s_curr:MigrationStep {step: $curr})
-          CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
-        `, { prev: h.step - 1, curr: h.step });
-      }
     }
 
     // C. Re-create discovered implicit dependency edges in Memgraph
@@ -521,7 +532,16 @@ app.post('/api/step', async (req, res) => {
       const files = savePlaybookAndLog(simState.step_counter, true, "migrate_success", valResult.logs, playbook);
 
       // 2. Create MigrationStep node and Transition link in Memgraph
+      let prevStep = 0;
+      const lastSuccess = simState.history.slice().reverse().find(h => h.success);
+      if (lastSuccess) {
+          prevStep = lastSuccess.step;
+      }
+      
       await session.run(`
+        MERGE (init:MigrationStep {step: 0})
+        ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+        WITH init
         CREATE (s:MigrationStep {
           id: $id, 
           step: $step, 
@@ -534,23 +554,22 @@ app.post('/api/step', async (req, res) => {
           variants: $variants,
           log_file: $log_file
         })
+        WITH s
+        OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+        WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+        FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+          CREATE (s_prev)-[:TRANSITION_TO]->(s)
+        )
       `, { 
-        id: `Step_${simState.step_counter}`, 
+        id: `Step_${simState.step_counter}_${Date.now()}_${Math.floor(Math.random()*1000)}`, 
         step: simState.step_counter, 
         cluster: Array.from(selectedCluster),
         logs: JSON.stringify(valResult.logs),
         ansible: playbook,
         variants: JSON.stringify(stepVariants),
-        log_file: files.logFile
+        log_file: files.logFile,
+        prev: prevStep
       });
-
-      if (simState.step_counter > 1) {
-        await session.run(`
-          MATCH (s_prev:MigrationStep {step: $prev})
-          MATCH (s_curr:MigrationStep {step: $curr})
-          CREATE (s_prev)-[:TRANSITION_TO]->(s_curr)
-        `, { prev: simState.step_counter - 1, curr: simState.step_counter });
-      }
     } else {
       // Rollback variants since step failed
       simState.active_variants = previousVariants;
@@ -584,7 +603,16 @@ app.post('/api/step', async (req, res) => {
         const files = savePlaybookAndLog(simState.step_counter, false, "migrate_fail", valResult.logs);
 
         // Create failed MigrationStep node in DB
+        let prevStep = 0;
+        const lastSuccess = simState.history.slice().reverse().find(h => h.success);
+        if (lastSuccess) {
+            prevStep = lastSuccess.step;
+        }
+
         await session.run(`
+          MERGE (init:MigrationStep {step: 0})
+          ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+          WITH init
           CREATE (s:MigrationStep {
             id: $id, 
             step: $step, 
@@ -596,13 +624,20 @@ app.post('/api/step', async (req, res) => {
             discovered_edge: $discovered_edge,
             log_file: $log_file
           })
+          WITH s
+          OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+          WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+          FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+            CREATE (s_prev)-[:TRANSITION_TO]->(s)
+          )
         `, {
-          id: `Step_${simState.step_counter}`,
+          id: `Step_${simState.step_counter}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
           step: simState.step_counter,
           cluster: Array.from(selectedCluster),
           logs: JSON.stringify(valResult.logs),
           discovered_edge: foundEdge,
-          log_file: files.logFile
+          log_file: files.logFile,
+          prev: prevStep
         });
       } else {
         // Temporal / Variant policy violation (rollback step counter)
@@ -612,7 +647,17 @@ app.post('/api/step', async (req, res) => {
         const files = savePlaybookAndLog(simState.step_counter + 1, false, "aborted_by_policy", valResult.logs);
 
         // Create aborted MigrationStep node in DB
+        let stepNum = simState.step_counter + 1;
+        let prevStep = 0;
+        const lastSuccess = simState.history.slice().reverse().find(h => h.success);
+        if (lastSuccess) {
+            prevStep = lastSuccess.step;
+        }
+
         await session.run(`
+          MERGE (init:MigrationStep {step: 0})
+          ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
+          WITH init
           CREATE (s:MigrationStep {
             id: $id, 
             step: $step, 
@@ -623,12 +668,19 @@ app.post('/api/step', async (req, res) => {
             logs: $logs,
             log_file: $log_file
           })
+          WITH s
+          OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
+          WHERE s_prev.status = 'success' OR s_prev.status = 'init'
+          FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
+            CREATE (s_prev)-[:TRANSITION_TO]->(s)
+          )
         `, {
-          id: `Step_${simState.step_counter + 1}`,
-          step: simState.step_counter + 1,
+          id: `Step_${stepNum}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+          step: stepNum,
           cluster: Array.from(selectedCluster),
           logs: JSON.stringify(valResult.logs),
-          log_file: files.logFile
+          log_file: files.logFile,
+          prev: prevStep
         });
       }
     }
