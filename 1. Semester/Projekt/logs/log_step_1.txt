@@ -1,7 +1,7 @@
 Step: 1
 Success: false
-Action: Failed: Webserver_Classic.KeyExchange_ECDHE to X25519_MLKEM768
-Timestamp: 2026-06-11T22:11:39.876Z
+Action: migrate_fail
+Timestamp: 2026-06-24T12:25:00.192Z
 
 Logs:
 Starting verification of PQC state...

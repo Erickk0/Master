@@ -1,0 +1,26 @@
+- name: Migrate Cert_RSA2048 to ML-DSA-44 (Step 4)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    migration_step: 4
+    migrated_nodes:
+      - Webserver_Classic.Cert_RSA2048
+    target_algorithms:
+      Webserver_Classic.Cert_RSA2048: ML-DSA-44
+  tasks:
+    - name: Deploy Post-Quantum Cryptographic Assets & Keys
+      ansible.builtin.copy:
+        content: >
+          # PQC Migrated Keys and Algorithms (Step 4)
+
+          # Run with: ansible-playbook -i inventory/localhost
+          playbooks/migrate_Cert_RSA2048_to_MLDSA44_step4.yml
+
+
+          # Node: Webserver_Classic.Cert_RSA2048 -> Algorithm: ML-DSA-44 (NIST
+          Security Level: 1, Key Size: 1312 bytes, Performance: HIGH)
+        dest: /etc/pqc/keys_step_4.conf
+    - name: Restart Migrated Services & Modules
+      ansible.builtin.systemd:
+        name: pqc_crypto_daemon
+        state: restarted

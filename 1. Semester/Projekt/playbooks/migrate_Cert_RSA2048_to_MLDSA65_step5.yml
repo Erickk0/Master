@@ -1,0 +1,26 @@
+- name: Migrate Cert_RSA2048 to ML-DSA-65 (Step 5)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    migration_step: 5
+    migrated_nodes:
+      - Webserver_Classic.Cert_RSA2048
+    target_algorithms:
+      Webserver_Classic.Cert_RSA2048: ML-DSA-65
+  tasks:
+    - name: Deploy Post-Quantum Cryptographic Assets & Keys
+      ansible.builtin.copy:
+        content: >
+          # PQC Migrated Keys and Algorithms (Step 5)
+
+          # Run with: ansible-playbook -i inventory/localhost
+          playbooks/migrate_Cert_RSA2048_to_MLDSA65_step5.yml
+
+
+          # Node: Webserver_Classic.Cert_RSA2048 -> Algorithm: ML-DSA-65 (NIST
+          Security Level: 3, Key Size: 1952 bytes, Performance: MEDIUM)
+        dest: /etc/pqc/keys_step_5.conf
+    - name: Restart Migrated Services & Modules
+      ansible.builtin.systemd:
+        name: pqc_crypto_daemon
+        state: restarted

@@ -13,76 +13,144 @@ Before running the CLI tool:
    ```
 2. Make sure you are in the project root directory:
    ```bash
-   cd "/Users/erickzeiler/Desktop/Master/1. Semester/Projekt"
+   cd "1. Semester/Projekt"
    ```
 
 ---
 
 ## 2. Command Reference
 
-### `cryme show system`
-Inspects the current cryptographic migration state of the entire digital twin, printing a structured overview table of all nodes.
+### `cryme show node [id=<id_or_name>]`
+
+Inspects cryptographic nodes in the digital twin. Without `id=`, prints all nodes; with `id=`, prints a single node.
 
 * **Usage**:
   ```bash
-  ./cryme show system
+  node cryme show node
+  node cryme show node id=Webserver_Classic.KeyExchange_ECDHE
   ```
 * **Output columns**:
-  - **ID**: The internal database element ID (integer) or node ID (string) of the cryptographic asset or security control. You can use either of these as the `id=` parameter in migration commands.
-  - **Type**: The type of the node (`CryptoAsset` or `SecurityControl`).
-  - **Component**: The component boundary the asset belongs to (e.g. `Webserver_Classic`).
-  - **Asset / Control Name**: Human-readable name of the cryptographic item.
-  - **Status**: The migration status of the node (green `migrated` or red `classic`).
-  - **Algorithm**: The currently active algorithm version (e.g. `ML-DSA-44`, `X25519_MLKEM768`, or `TLS1.3`).
+  - **ID**: Memgraph internal ID (usable in `migrate id=…`)
+  - **Type**: `CryptoAsset` or `SecurityControl`
+  - **Component**, **Asset / Control Name**, **Status**, **Algorithm**
+
+> `show system` is deprecated — use `show node`.
 
 ---
 
-### `cryme migrate id=<id_or_name> <target_algorithm>`
-Trigger a dynamic migration of a specific cryptographic asset or security control.
+### `cryme show tree`
 
-* **Usage**:
-  ```bash
-  ./cryme migrate id=<db_id_or_string_id> <target_algorithm_or_variant_id>
-  ```
-* **Arguments**:
-  - `id=<id_or_name>`: The database internal integer ID (e.g. `359`) or the full string name (e.g. `Webserver_Classic.KeyExchange_ECDHE`).
-  - `<target_algorithm>`: The PQC algorithm (e.g. `X25519_MLKEM768`, `ML-DSA-44`) or protocol version (e.g. `TLS1.3`) you wish to deploy. For cryptographic assets, you can specify either the algorithm family name or the specific variant ID (e.g. `KeyExchange_ECDHE_mlkem768`).
-* **Validation & Execution Sequence**:
-  1. Resolves the target node in the graph database.
-  2. Identifies if the target node belongs to a strongly connected component (SCC) cluster of dependent classic nodes.
-  3. Simulates the parallel migration of the entire cluster, automatically matching compatible variants for all secondary classic nodes in the cluster.
-  4. Queries the Oracle verification rules (temporal phase barriers, structural communicating paths, and variant family compatibilities).
-  5. **If Oracle Validates (Success)**:
-     - Mutates status to `migrated` and registers the active algorithm for all nodes in the cluster in the database.
-     - Dynamically generates an Ansible playbook and saves it to `playbooks/step_<step_num>_migration.yml`.
-     - Logs the success sequence in `logs/log_step_<step_num>.txt`.
-     - Inserts a successful `MigrationStep` node in Memgraph, mapping the log file path and the co-migrated cluster IDs.
-  6. **If Oracle Blocks (Failure / Policy Denied)**:
-     - Reverts proposed changes and preserves the database state.
-     - If it was a structural TLS path failure, automatically registers the newly discovered implicit dependency in Memgraph.
-     - Logs the failure sequence and errors in `logs/log_step_<step_num>.txt`.
-     - Inserts a failed/aborted `MigrationStep` node in Memgraph, mapping the log file path.
-     - Exits with a non-zero exit code (`1`).
+Displays the migration step history as an ASCII tree. The current successful step is marked with `(HEAD)` (like Git).
 
-* **Examples**:
-  ```bash
-  # Attempting to migrate server key exchange (will fail and discover implicit link to browser)
-  ./cryme migrate id=359 X25519_MLKEM768
-  
-  # Co-migrating browser and server key exchange cluster (will succeed)
-  ./cryme migrate id=359 X25519_MLKEM768
-  
-  # Migrating webserver security control to TLS 1.3
-  ./cryme migrate id=355 TLS1.3
-  ```
+```bash
+node cryme show tree
+```
 
 ---
 
-## 3. Repositories Output Artifacts
+### `cryme show graph [step=<N>] [--before]`
 
-* **Playbooks Directory**: `playbooks/`
-  - Playbooks are saved as `step_<step_num>_migration.yml`.
-  - Mapped variables (`migrated_nodes`) in the playbook list the exact database IDs/names of all nodes migrated during that transaction.
-* **Logs Directory**: `logs/`
-  - Logs are saved as `log_step_<step_num>.txt`.
-  - Logs capture the execution status (success, structural failure, aborted by policy), the exact list of migrated nodes, and the line-by-line output of the Oracle checks.
+Shows the dependency graph (nodes + edges) at a migration step as ASCII.
+
+```bash
+node cryme show graph              # graph at HEAD
+node cryme show graph step=2       # graph after step 2
+node cryme show graph step=2 --before   # graph before step 2
+```
+
+Migrated nodes changed in that step are marked with `*`.
+
+---
+
+### `cryme show step step=<N>`
+
+Shows full details of a migration step (like `git show`): metadata, cluster, oracle logs, playbook path, and diff.
+
+```bash
+node cryme show step step=2
+```
+
+---
+
+### `cryme show diff step=<N>`
+
+Shows what changed in step N (like `git diff`): node status/algorithm before and after, discovered edges.
+
+```bash
+node cryme show diff step=2
+```
+
+---
+
+### `cryme migrate`
+
+Trigger a migration of one or more cryptographic assets or security controls.
+
+**Mode A — one algorithm for all nodes (comma-separated IDs):**
+```bash
+node cryme migrate id=359,362 X25519_MLKEM768
+node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+```
+
+**Mode B — per-node algorithm:**
+```bash
+node cryme migrate \
+  id=Webserver_Classic.KeyExchange_ECDHE:X25519_MLKEM768 \
+  id=Client_Browser.KeyExchange_ECDHE:X25519_MLKEM768
+```
+
+* **Validation & Execution**:
+  1. Resolves target node(s) in Memgraph.
+  2. Unions SCC clusters for all specified nodes.
+  3. Runs Oracle checks (temporal, structural, variant compatibility).
+  4. On success: updates nodes, writes `MigrationStep` with deltas, sets HEAD, generates Ansible playbook.
+  5. On failure: logs attempt, may discover implicit dependency edges.
+
+---
+
+## 3. Output Artifacts
+
+### Playbooks (`playbooks/`)
+
+New playbooks use descriptive names:
+```
+migrate_<nodes>_to_<algo>_step<N>.yml
+```
+
+Example: `migrate_KeyExchange_ECDHE_to_X25519MLKEM768_step2.yml`
+
+Legacy files (`step_N_migration.yml`) remain for older steps.
+
+Each playbook includes:
+- `vars.migration_step`, `vars.migrated_nodes`, `vars.target_algorithms`
+- A comment with the `ansible-playbook` command
+
+### Logs (`logs/`)
+
+`log_step_<N>.txt` — oracle output, success/failure status, timestamp.
+
+---
+
+## 4. Running Ansible Playbooks
+
+After a successful migration, find the playbook path with:
+
+```bash
+node cryme show step step=2
+```
+
+Run the playbook (demo setup targets `localhost`):
+
+```bash
+ansible-playbook -i inventory/localhost playbooks/migrate_KeyExchange_ECDHE_to_X25519MLKEM768_step2.yml
+```
+
+The playbook deploys PQC key configuration to `/etc/pqc/keys_step_<N>.conf` and restarts the demo `pqc_crypto_daemon` service.
+
+> For production, replace `hosts: localhost` and inventory with your real target hosts.
+
+---
+
+## 5. Graph Versioning
+
+See [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) for the data model, HEAD pointer, event-sourcing replay, and best practices.

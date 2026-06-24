@@ -11,8 +11,15 @@ const {
   loadStateFromDB,
   checkOracleValidation,
   generatePlaybookContent,
-  savePlaybookAndLog
+  buildPlaybookFilename,
+  savePlaybookAndLog,
+  reconstructStateAtStep,
+  getHeadStep,
+  updateHeadStep,
+  computeNodeChanges,
+  computeEdgeChanges
 } = require('./oracle');
+const { populateMemgraphWithTwin } = require('./twin_loader');
 
 const app = express();
 app.use(express.json());
@@ -37,106 +44,6 @@ let simState = {
 // ============================================================================
 // API Endpoints
 // ============================================================================
-
-// Helper to populate Memgraph with elements from Digital Twin
-async function populateMemgraphWithTwin(session, twin) {
-  // A. Create Components, SecurityControls, CryptoAssets, and Variants
-  for (const comp of twin.components) {
-    const compId = comp.component_id;
-    const phase = comp.phase || 0;
-
-    await session.run(
-      "CREATE (c:Component {id: $id, name: $name, type: $type, phase: $phase})",
-      { id: compId, name: comp.name, type: comp.type, phase: phase }
-    );
-
-    for (const ctrl of comp.security_controls || []) {
-      const ctrlId = `${compId}.${ctrl.control_name.replace(/ /g, '_')}`;
-      await session.run(`
-        MATCH (c:Component {id: $compId})
-        CREATE (ctrl:SecurityControl {id: $ctrlId, name: $name, status: 'classic'})
-        CREATE (c)-[:HAS_CONTROL]->(ctrl)
-      `, { compId, ctrlId, name: ctrl.control_name });
-    }
-
-    for (const asset of comp.cryptographic_assets || []) {
-      const assetId = `${compId}.${asset.asset_id}`;
-      await session.run(`
-        MATCH (c:Component {id: $compId})
-        CREATE (a:CryptoAsset {id: $assetId, type: $type, algorithm: $algo, status: 'classic'})
-        CREATE (c)-[:HAS_ASSET]->(a)
-      `, { compId, assetId, type: asset.asset_type, algo: asset.algorithm || "" });
-
-      for (const v of asset.migration_variants || []) {
-        const varId = `${assetId}.${v.variant_id}`;
-        await session.run(`
-          MATCH (a:CryptoAsset {id: $assetId})
-          CREATE (var:PQCVariant {id: $varId, algorithm: $algo, security_level: $level, key_size: $size, performance: $perf})
-          CREATE (a)-[:HAS_VARIANT]->(var)
-        `, { assetId, varId, algo: v.algorithm, level: v.security_level, size: v.key_size_bytes, perf: v.performance });
-      }
-    }
-  }
-
-  // B. Create Intra-component explicit/implicit dependencies
-  for (const comp of twin.components) {
-    const compId = comp.component_id;
-
-    for (const dep of comp.dependencies?.implicit || []) {
-      const srcId = `${compId}.${dep.source.replace(/ /g, '_')}`;
-      const tgtId = `${compId}.${dep.target}`;
-      await session.run(`
-        MATCH (src {id: $srcId})
-        MATCH (tgt {id: $tgtId})
-        CREATE (src)-[:IMPLICIT_DEPENDENCY {type: $type}]->(tgt)
-      `, { srcId, tgtId, type: dep.type });
-    }
-
-    for (const dep of comp.dependencies?.explicit || []) {
-      const srcId = `${compId}.${dep.source.replace(/ /g, '_')}`;
-      const tgtId = `${compId}.${dep.target}`;
-      await session.run(`
-        MATCH (src {id: $srcId})
-        MATCH (tgt {id: $tgtId})
-        CREATE (src)-[:EXPLICIT_DEPENDENCY {type: $type}]->(tgt)
-      `, { srcId, tgtId, type: dep.type });
-    }
-
-    // Create component not_before temporal constraints
-    for (const nb of comp.not_before || []) {
-      await session.run(`
-        MATCH (c1:Component {id: $c1})
-        MATCH (c2:Component {id: $c2})
-        CREATE (c1)-[:TEMPORAL_CONSTRAINT {type: 'not_before'}]->(c2)
-      `, { c1: compId, c2: nb });
-    }
-  }
-
-  // C. Create Global/External dependencies (handling node creation for external elements dynamically)
-  for (const gDep of twin.global_dependencies || []) {
-    const nodes = gDep.nodes || [];
-    if (nodes.length >= 2) {
-      const u = nodes[0];
-      const v = nodes[1];
-
-      // Ensure nodes exist in database (e.g. Client_Browser nodes)
-      for (const nid of nodes) {
-        const name = nid.split('.').pop();
-        await session.run(`
-          MERGE (n {id: $nid})
-          ON CREATE SET n:CryptoAsset, n.name = $name, n.status = 'classic'
-        `, { nid, name });
-      }
-
-      await session.run(`
-        MATCH (src {id: $u})
-        MATCH (tgt {id: $v})
-        CREATE (src)-[:GLOBAL_DEPENDENCY {id: $id, type: $type, description: $desc}]->(tgt)
-        CREATE (tgt)-[:GLOBAL_DEPENDENCY {id: $id, type: $type, description: $desc}]->(src)
-      `, { u, v, id: gDep.dependency_id, type: gDep.type, desc: gDep.description });
-    }
-  }
-}
 
 // 1. Initialize Scenario Node Structure in Memgraph Database
 app.post('/api/init', async (req, res) => {
@@ -307,20 +214,27 @@ async function reloadLocalStateFromDB(session, preserveState = false) {
 app.get('/api/graph', async (req, res) => {
   const session = driver.session();
   try {
-    // Reload state from database live to keep sync with CLI tool
     simState = await loadStateFromDB(session);
+    const headStep = await getHeadStep(session);
+    const stepQuery = req.query.step !== undefined ? parseInt(req.query.step, 10) : null;
+    const atStep = stepQuery !== null && !isNaN(stepQuery) ? stepQuery : headStep;
+    const before = req.query.before === 'true';
+    const replayState = await reconstructStateAtStep(session, atStep, { before });
 
-    // Query actual nodes and their status properties from Memgraph
-    const nodeRes = await session.run("MATCH (n) WHERE n:CryptoAsset OR n:SecurityControl RETURN n.id AS id, n.name AS name, n.status AS status, labels(n)[0] AS label, n.active_algorithm AS algo");
+    const nodeRes = await session.run("MATCH (n) WHERE n:CryptoAsset OR n:SecurityControl RETURN n.id AS id, n.name AS name, labels(n)[0] AS label");
     const edgeRes = await session.run("MATCH (u)-[r]->(v) WHERE NOT type(r)='HAS_VARIANT' AND NOT type(r)='HAS_ASSET' AND NOT type(r)='HAS_CONTROL' AND NOT type(r)='TEMPORAL_CONSTRAINT' RETURN u.id AS src, v.id AS tgt, type(r) AS type, r.discovered AS disc");
 
-    let nodes = nodeRes.records.map(rec => ({
-      id: rec.get('id'),
-      name: rec.get('name'),
-      status: rec.get('status') || 'classic',
-      type: rec.get('label'),
-      algo: rec.get('algo') || ''
-    }));
+    let nodes = nodeRes.records.map(rec => {
+      const id = rec.get('id');
+      const replayNode = replayState.nodes.get(id);
+      return {
+        id,
+        name: rec.get('name'),
+        status: replayNode ? replayNode.status : 'classic',
+        type: rec.get('label'),
+        algo: replayNode && replayNode.active_algorithm ? replayNode.active_algorithm : ''
+      };
+    });
 
     let edges = edgeRes.records.map(rec => ({
       from: rec.get('src'),
@@ -329,14 +243,29 @@ app.get('/api/graph', async (req, res) => {
       discovered: rec.get('disc') === true
     }));
 
+    if (stepQuery !== null) {
+      edges = Array.from(replayState.edges).map(e => {
+        const [from, to] = e.split('->');
+        const meta = replayState.edgeMeta[e] || {};
+        return {
+          from,
+          to,
+          type: meta.type || 'IMPLICIT',
+          discovered: meta.discovered === true
+        };
+      });
+    }
+
     res.json({
       success: true,
       nodes,
       edges,
       step_counter: simState.step_counter,
+      head_step: headStep,
+      replay_step: atStep,
       is_completed: simState.is_completed,
       history: simState.history,
-      active_variants: simState.active_variants
+      active_variants: replayState.active_variants
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -357,6 +286,7 @@ app.post('/api/reset', async (req, res) => {
     
     // C. Delete chronological step nodes
     await session.run("MATCH (s:MigrationStep) DETACH DELETE s");
+    await session.run("MATCH (m:SystemMeta) DETACH DELETE m");
 
     // D. Re-load cache variables
     await reloadLocalStateFromDB(session);
@@ -418,6 +348,14 @@ app.post('/api/revert', async (req, res) => {
 
     // Reload the fresh state from DB
     simState = await loadStateFromDB(session);
+
+    const lastSuccess = simState.history.slice().reverse().find(h => h.success);
+    if (lastSuccess) {
+      await updateHeadStep(session, lastSuccess.step);
+    } else {
+      await session.run("MATCH (s:MigrationStep) WHERE s.head = true SET s.head = false");
+      await session.run("MATCH (m:SystemMeta {id: 'cryme'}) DETACH DELETE m");
+    }
 
     res.json({
       success: true,
@@ -515,6 +453,13 @@ app.post('/api/step', async (req, res) => {
     let playbook = "";
 
     if (valResult.success) {
+      let prevStep = 0;
+      const lastSuccess = simState.history.slice().reverse().find(h => h.success);
+      if (lastSuccess) {
+        prevStep = lastSuccess.step;
+      }
+      const beforeState = await reconstructStateAtStep(session, prevStep, { before: false });
+
       // 1. Commit status changes to Memgraph database
       for (const node of selectedCluster) {
         let varSelected = simState.active_variants[node];
@@ -525,34 +470,54 @@ app.post('/api/step', async (req, res) => {
         `, { nodeId: node, step: simState.step_counter, algo: algo });
       }
 
-      // Generate Ansible playbook
-      playbook = generatePlaybookContent(selectedCluster, simState.step_counter, simState.active_variants);
-      
-      // Save playbook and log to repo
-      const files = savePlaybookAndLog(simState.step_counter, true, "migrate_success", valResult.logs, playbook);
+      const dbVariants = {};
+      selectedCluster.forEach(n => { dbVariants[n] = simState.active_variants[n]; });
+      const playbookFileName = buildPlaybookFilename(simState.step_counter, Array.from(selectedCluster), dbVariants);
+      playbook = generatePlaybookContent(selectedCluster, simState.step_counter, simState.active_variants, playbookFileName);
 
-      // 2. Create MigrationStep node and Transition link in Memgraph
-      let prevStep = 0;
-      const lastSuccess = simState.history.slice().reverse().find(h => h.success);
-      if (lastSuccess) {
-          prevStep = lastSuccess.step;
-      }
-      
+      const files = savePlaybookAndLog(simState.step_counter, true, "migrate_success", valResult.logs, playbook, {
+        cluster: Array.from(selectedCluster),
+        variants: dbVariants,
+        playbookFileName
+      });
+
+      const afterState = {
+        nodes: new Map(beforeState.nodes),
+        edges: new Set(beforeState.edges),
+        edgeMeta: { ...beforeState.edgeMeta }
+      };
+      afterState.nodes.forEach((node, id) => afterState.nodes.set(id, { ...node }));
+      selectedCluster.forEach(nodeId => {
+        const node = afterState.nodes.get(nodeId);
+        if (node) {
+          node.status = 'migrated';
+          node.active_algorithm = dbVariants[nodeId]?.algorithm || 'Post-Quantum';
+          node.migrated_at_step = simState.step_counter;
+        }
+      });
+      const nodeChanges = computeNodeChanges(beforeState, afterState);
+      const edgeChanges = computeEdgeChanges(beforeState, afterState);
+
       await session.run(`
         MERGE (init:MigrationStep {step: 0})
         ON CREATE SET init.id = 'Step_0', init.status = 'init', init.action = 'system_start', init.timestamp = timestamp()
         WITH init
         CREATE (s:MigrationStep {
-          id: $id, 
-          step: $step, 
-          timestamp: timestamp(), 
-          status: 'success', 
+          id: $id,
+          step: $step,
+          timestamp: timestamp(),
+          status: 'success',
           action: 'migrate_success',
           cluster: $cluster,
           logs: $logs,
           ansible: $ansible,
           variants: $variants,
-          log_file: $log_file
+          log_file: $log_file,
+          playbook_file: $playbook_file,
+          node_changes: $node_changes,
+          edge_changes: $edge_changes,
+          parent_step: $prev,
+          head: false
         })
         WITH s
         OPTIONAL MATCH (s_prev:MigrationStep {step: $prev})
@@ -560,16 +525,21 @@ app.post('/api/step', async (req, res) => {
         FOREACH (x IN CASE WHEN s_prev IS NOT NULL THEN [1] ELSE [] END |
           CREATE (s_prev)-[:TRANSITION_TO]->(s)
         )
-      `, { 
-        id: `Step_${simState.step_counter}_${Date.now()}_${Math.floor(Math.random()*1000)}`, 
-        step: simState.step_counter, 
+      `, {
+        id: `Step_${simState.step_counter}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        step: simState.step_counter,
         cluster: Array.from(selectedCluster),
         logs: JSON.stringify(valResult.logs),
         ansible: playbook,
         variants: JSON.stringify(stepVariants),
         log_file: files.logFile,
+        playbook_file: files.playbookFile,
+        node_changes: JSON.stringify(nodeChanges),
+        edge_changes: JSON.stringify(edgeChanges),
         prev: prevStep
       });
+
+      await updateHeadStep(session, simState.step_counter);
     } else {
       // Rollback variants since step failed
       simState.active_variants = previousVariants;
@@ -706,7 +676,10 @@ app.get('/api/ansible/:step', (req, res) => {
   if (!stepData) {
     return res.status(404).send("Playbook not found for this successful step.");
   }
-  res.setHeader('Content-disposition', `attachment; filename=step_${stepNum}_migration.yml`);
+  const filename = stepData.playbook_file
+    ? path.basename(stepData.playbook_file)
+    : `step_${stepNum}_migration.yml`;
+  res.setHeader('Content-disposition', `attachment; filename=${filename}`);
   res.setHeader('Content-type', 'text/yaml');
   res.write(stepData.ansible);
   res.end();

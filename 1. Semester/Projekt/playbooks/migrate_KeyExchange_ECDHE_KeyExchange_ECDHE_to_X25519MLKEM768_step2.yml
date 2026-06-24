@@ -1,0 +1,32 @@
+- name: Migrate KeyExchange_ECDHE + KeyExchange_ECDHE to X25519_MLKEM768 (Step 2)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    migration_step: 2
+    migrated_nodes:
+      - Webserver_Classic.KeyExchange_ECDHE
+      - Client_Browser.KeyExchange_ECDHE
+    target_algorithms:
+      Webserver_Classic.KeyExchange_ECDHE: X25519_MLKEM768
+      Client_Browser.KeyExchange_ECDHE: X25519_MLKEM768
+  tasks:
+    - name: Deploy Post-Quantum Cryptographic Assets & Keys
+      ansible.builtin.copy:
+        content: >
+          # PQC Migrated Keys and Algorithms (Step 2)
+
+          # Run with: ansible-playbook -i inventory/localhost
+          playbooks/migrate_KeyExchange_ECDHE_KeyExchange_ECDHE_to_X25519MLKEM768_step2.yml
+
+
+          # Node: Webserver_Classic.KeyExchange_ECDHE -> Algorithm:
+          X25519_MLKEM768 (NIST Security Level: 3, Key Size: 1184 bytes,
+          Performance: HIGH)
+
+          # Node: Client_Browser.KeyExchange_ECDHE -> Algorithm: X25519_MLKEM768
+          (NIST Security Level: 0, Key Size: 0 bytes, Performance: UNKNOWN)
+        dest: /etc/pqc/keys_step_2.conf
+    - name: Restart Migrated Services & Modules
+      ansible.builtin.systemd:
+        name: pqc_crypto_daemon
+        state: restarted

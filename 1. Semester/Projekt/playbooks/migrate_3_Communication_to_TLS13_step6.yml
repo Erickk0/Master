@@ -1,0 +1,27 @@
+- name: Migrate 3_Communication to TLS1.3 (Step 6)
+  hosts: localhost
+  gather_facts: false
+  vars:
+    migration_step: 6
+    migrated_nodes:
+      - Webserver_Classic.TLS_1.2_/_1.3_Communication
+    target_algorithms:
+      Webserver_Classic.TLS_1.2_/_1.3_Communication: TLS1.3
+  tasks:
+    - name: Deploy Post-Quantum Cryptographic Assets & Keys
+      ansible.builtin.copy:
+        content: >
+          # PQC Migrated Keys and Algorithms (Step 6)
+
+          # Run with: ansible-playbook -i inventory/localhost
+          playbooks/migrate_3_Communication_to_TLS13_step6.yml
+
+
+          # Node: Webserver_Classic.TLS_1.2_/_1.3_Communication -> Algorithm:
+          TLS1.3 (NIST Security Level: 0, Key Size: 0 bytes, Performance:
+          UNKNOWN)
+        dest: /etc/pqc/keys_step_6.conf
+    - name: Restart Migrated Services & Modules
+      ansible.builtin.systemd:
+        name: pqc_crypto_daemon
+        state: restarted

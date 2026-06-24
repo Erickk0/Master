@@ -1,11 +1,11 @@
 Step: 2
 Success: true
 Action: migrate_success
-Timestamp: 2026-06-11T22:11:45.338Z
+Timestamp: 2026-06-24T12:25:37.095Z
 
 Logs:
 Starting verification of PQC state...
-Currently Migrated Nodes: [Client_Browser.KeyExchange_ECDHE, Webserver_Classic.KeyExchange_ECDHE]
+Currently Migrated Nodes: [Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE]
 [+] Service health check: TLS negotiability validated and successfully established.
 [+] Cryptographic handshake: SECURE.
 [+] Oracle Result: SUCCESS (✓)
