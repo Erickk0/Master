@@ -1,7 +1,7 @@
 Step: 1
 Success: false
 Action: migrate_fail
-Timestamp: 2026-06-24T12:25:00.192Z
+Timestamp: 2026-06-26T13:19:02.241Z
 
 Logs:
 Starting verification of PQC state...
