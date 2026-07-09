@@ -1160,6 +1160,101 @@ function buildPlaybookFilename(stepNum, cluster, variants) {
   return `migrate_${nodes}_to_${algo}_step${stepNum}.yml`;
 }
 
+const DEPLOY_ROOT = process.env.CRYME_DEPLOY_ROOT || path.join(__dirname, '../deploy');
+const ANSIBLE_HOSTS = process.env.CRYME_ANSIBLE_HOSTS || 'webserver';
+
+const BASELINE_FILES = {
+  runtime: path.join(DEPLOY_ROOT, 'state/runtime.baseline.json'),
+  data: path.join(DEPLOY_ROOT, 'state/data.baseline.json'),
+  nginx: path.join(DEPLOY_ROOT, 'nginx/baseline/tls.conf'),
+  client: path.join(DEPLOY_ROOT, 'client/expect.baseline.env')
+};
+
+const LIVE_FILES = {
+  runtime: path.join(DEPLOY_ROOT, 'state/runtime.json'),
+  data: path.join(DEPLOY_ROOT, 'state/data.json'),
+  nginx: path.join(DEPLOY_ROOT, 'nginx/live/tls.conf'),
+  client: path.join(DEPLOY_ROOT, 'client/expect.env')
+};
+
+function resetLiveServiceState(options = {}) {
+  const logFn = options.log || (() => {});
+  const reloadNginx = options.reloadNginx !== false;
+
+  for (const key of Object.keys(BASELINE_FILES)) {
+    if (!fs.existsSync(BASELINE_FILES[key])) {
+      return { success: false, error: `Baseline file missing: ${BASELINE_FILES[key]}` };
+    }
+    fs.copyFileSync(BASELINE_FILES[key], LIVE_FILES[key]);
+    logFn(`[+] Reset ${key} → ${path.relative(path.join(__dirname, '..'), LIVE_FILES[key])}`);
+  }
+
+  if (reloadNginx) {
+    const { spawnSync } = require('child_process');
+    const container = process.env.CRYME_NGINX_CONTAINER || 'cryme-nginx-classic';
+    let result = spawnSync('docker', ['exec', container, 'nginx', '-s', 'reload'], { stdio: 'pipe' });
+    if (result.status !== 0) {
+      result = spawnSync('sudo', ['docker', 'exec', container, 'nginx', '-s', 'reload'], { stdio: 'pipe' });
+    }
+    if (result.status !== 0) {
+      const err = (result.stderr && result.stderr.toString()) || 'nginx reload failed';
+      logFn(`[!] Warning: could not reload nginx (${err.trim()})`);
+      return { success: true, warning: err.trim(), reloaded: false };
+    }
+    logFn('[+] nginx reloaded with baseline TLS config');
+  }
+
+  return { success: true, reloaded: reloadNginx };
+}
+
+function buildTargetAlgorithmsFromState(state) {
+  const targetAlgorithms = {};
+  state.nodes.forEach((node, nodeId) => {
+    if (node.status === 'migrated' && node.active_algorithm) {
+      targetAlgorithms[nodeId] = node.active_algorithm;
+    }
+  });
+  return targetAlgorithms;
+}
+
+function buildDeployVarsFromState(state, stepNum) {
+  const targetAlgorithms = buildTargetAlgorithmsFromState(state);
+  const migratedNodes = Object.keys(targetAlgorithms);
+  return {
+    migration_step: stepNum,
+    migrated_nodes: migratedNodes,
+    target_algorithms: targetAlgorithms
+  };
+}
+
+async function getStepDeployInfo(session, stepNum) {
+  const stepsRes = await session.run(`
+    MATCH (s:MigrationStep {step: $step})
+    RETURN s.status AS status, s.playbook_file AS playbook_file, s.cluster AS cluster
+  `, { step: stepNum });
+
+  if (stepsRes.records.length === 0) {
+    return { error: `Migration step ${stepNum} not found.` };
+  }
+
+  const status = stepsRes.records[0].get('status');
+  if (status !== 'success') {
+    return { error: `Migration step ${stepNum} is '${status}' — only successful steps can be deployed.` };
+  }
+
+  const state = await reconstructStateAtStep(session, stepNum, { before: false });
+  const deployVars = buildDeployVarsFromState(state, stepNum);
+
+  return {
+    stepNum,
+    status,
+    playbookFile: stepsRes.records[0].get('playbook_file'),
+    cluster: stepsRes.records[0].get('cluster') || [],
+    deployVars,
+    state
+  };
+}
+
 function generatePlaybookContent(cluster, stepNum, chosenVariants, playbookFileName) {
   const targetAlgorithms = {};
   Array.from(cluster).forEach(node => {
@@ -1169,47 +1264,38 @@ function generatePlaybookContent(cluster, stepNum, chosenVariants, playbookFileN
 
   const shortNames = cluster.map(n => n.split('.').pop()).slice(0, 2).join(' + ');
   const primaryAlgo = Object.values(targetAlgorithms)[0] || 'PQC';
+  const deployPlaybook = `deploy/playbooks/apply_tls.yml`;
+  const inventory = `deploy/inventory/hosts.ini`;
 
   let play = {
     name: `Migrate ${shortNames} to ${primaryAlgo} (Step ${stepNum})`,
-    hosts: "localhost",
+    hosts: ANSIBLE_HOSTS,
     gather_facts: false,
     vars: {
       migration_step: stepNum,
       migrated_nodes: Array.from(cluster),
       target_algorithms: targetAlgorithms
     },
-    tasks: []
+    tasks: [
+      {
+        name: "Apply CRYME migration to TLS stack",
+        "ansible.builtin.include_role": {
+          name: "cryme_tls"
+        }
+      }
+    ]
   };
 
-  let keysContent = `# PQC Migrated Keys and Algorithms (Step ${stepNum})\n`;
-  keysContent += `# Run with: ansible-playbook -i inventory/localhost playbooks/${playbookFileName || buildPlaybookFilename(stepNum, cluster, chosenVariants)}\n\n`;
-  Array.from(cluster).forEach(node => {
-    const varSelected = chosenVariants[node];
-    if (varSelected) {
-      keysContent += `# Node: ${node} -> Algorithm: ${varSelected.algorithm} (NIST Security Level: ${varSelected.security_level}, Key Size: ${varSelected.key_size_bytes} bytes, Performance: ${String(varSelected.performance).toUpperCase()})\n`;
-    } else {
-      keysContent += `# Node: ${node} -> Default PQC Config\n`;
-    }
-  });
+  const header = [
+    `# CRYME migration playbook (Step ${stepNum})`,
+    `# Deploy TLS stack: ANSIBLE_CONFIG=deploy/ansible.cfg ansible-playbook -i ${inventory} ${deployPlaybook} \\`,
+    `#   -e 'migration_step=${stepNum}' -e @deploy/vars/step_${stepNum}.json`,
+    `# Or use: node cryme deploy step=${stepNum}`,
+    `# Nodes in this step: ${Array.from(cluster).join(', ')}`,
+    ''
+  ].join('\n');
 
-  play.tasks.push({
-    name: "Deploy Post-Quantum Cryptographic Assets & Keys",
-    "ansible.builtin.copy": {
-      content: keysContent,
-      dest: `/etc/pqc/keys_step_${stepNum}.conf`
-    }
-  });
-
-  play.tasks.push({
-    name: "Restart Migrated Services & Modules",
-    "ansible.builtin.systemd": {
-      name: "pqc_crypto_daemon",
-      state: "restarted"
-    }
-  });
-
-  return yaml.dump([play], { noRefs: true, sortKeys: false });
+  return header + yaml.dump([play], { noRefs: true, sortKeys: false });
 }
 
 // Save Playbook and Logs to Repository
@@ -1254,6 +1340,9 @@ module.exports = {
   driver,
   URI,
   YAML_PATH,
+  DEPLOY_ROOT,
+  ANSIBLE_HOSTS,
+  resetLiveServiceState,
   computeSCCs,
   computeTransitiveReduction,
   loadStateFromDB,
@@ -1271,6 +1360,9 @@ module.exports = {
   checkOracleValidation,
   generatePlaybookContent,
   buildPlaybookFilename,
+  buildTargetAlgorithmsFromState,
+  buildDeployVarsFromState,
+  getStepDeployInfo,
   savePlaybookAndLog,
   computeNodeChanges,
   computeEdgeChanges,

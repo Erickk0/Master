@@ -69,9 +69,15 @@ node cryme show diff step=2
 node cryme show step step=2
 ```
 
-Run the generated Ansible playbook (path from `show step`):
+Run deploy + TLS verify after each successful step:
 ```bash
-ansible-playbook -i inventory/localhost playbooks/migrate_KeyExchange_ECDHE_to_X25519MLKEM768_step2.yml
+node cryme deploy step=2
+node cryme verify tls step=2
+```
+
+Full automated server demo:
+```bash
+bash deploy/run_demo.sh
 ```
 
 See [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) for the full graph versioning model.

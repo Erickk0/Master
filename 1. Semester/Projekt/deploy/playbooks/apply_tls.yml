@@ -1,0 +1,7 @@
+---
+# Standalone deploy playbook — used by `cryme deploy step=N`
+- name: Apply CRYME migration to TLS stack
+  hosts: webserver
+  gather_facts: false
+  roles:
+    - role: cryme_tls

@@ -1,0 +1,77 @@
+# CRYME live service stack — Memgraph + nginx (TLS + API) + curl client
+# Usage: docker compose -f deploy/docker-compose.yml up -d
+
+x-proxy-env: &proxy-env
+  HTTP_PROXY: ${HTTP_PROXY:-http://proxy.cs.hs-rm.de:8080}
+  HTTPS_PROXY: ${HTTPS_PROXY:-http://proxy.cs.hs-rm.de:8080}
+  http_proxy: ${http_proxy:-http://proxy.cs.hs-rm.de:8080}
+  https_proxy: ${https_proxy:-http://proxy.cs.hs-rm.de:8080}
+  NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,nginx-classic,memgraph,curl-client,cryme-net}
+  no_proxy: ${no_proxy:-localhost,127.0.0.1,nginx-classic,memgraph,curl-client,cryme-net}
+
+services:
+  memgraph:
+    image: memgraph/memgraph:latest
+    container_name: cryme-memgraph
+    ports:
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - memgraph-data:/var/lib/memgraph
+    restart: unless-stopped
+    networks:
+      - cryme-net
+
+  memgraph-lab:
+    image: memgraph/lab:latest
+    container_name: cryme-memgraph-lab
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - memgraph
+    environment:
+      QUICK_CONNECT_MG_HOST: memgraph
+      QUICK_CONNECT_MG_PORT: "7687"
+    restart: unless-stopped
+    networks:
+      - cryme-net
+
+  nginx-classic:
+    image: nginx:1.27-alpine
+    container_name: cryme-nginx-classic
+    ports:
+      - "127.0.0.1:8443:443"
+    volumes:
+      - ./nginx/live:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./state:/state:ro
+    depends_on:
+      - memgraph
+    restart: unless-stopped
+    networks:
+      - cryme-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "--no-check-certificate", "https://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  curl-client:
+    image: curlimages/curl:8.11.1
+    container_name: cryme-curl-client
+    entrypoint: ["sleep", "infinity"]
+    depends_on:
+      nginx-classic:
+        condition: service_healthy
+    volumes:
+      - ./client:/client:ro
+    restart: unless-stopped
+    networks:
+      - cryme-net
+
+networks:
+  cryme-net:
+    name: cryme-net
+
+volumes:
+  memgraph-data:

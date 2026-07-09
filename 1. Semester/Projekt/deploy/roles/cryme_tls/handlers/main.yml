@@ -1,0 +1,6 @@
+---
+- name: Reload nginx inside Docker container
+  ansible.builtin.command:
+    cmd: "docker exec {{ nginx_container_name }} nginx -s reload"
+  become: true
+  changed_when: true

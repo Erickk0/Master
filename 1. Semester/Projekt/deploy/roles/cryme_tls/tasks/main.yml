@@ -1,0 +1,105 @@
+---
+- name: Compute TLS profile from CRYME target_algorithms
+  ansible.builtin.set_fact:
+    cryme_kex_algo: "{{ target_algorithms.get(node_keyexchange_server, 'ECDHE') }}"
+    cryme_cert_algo: "{{ target_algorithms.get(node_cert, 'RSA-2048') }}"
+    cryme_tls_algo: "{{ target_algorithms.get(node_tls_control, 'TLS1.2/1.3') }}"
+    cryme_client_kex: "{{ target_algorithms.get(node_keyexchange_client, 'ECDHE') }}"
+
+- name: Derive TLS flags
+  ansible.builtin.set_fact:
+    use_mldsa_cert: "{{ cryme_cert_algo is search('(?i)ML-DSA') }}"
+    tls13_only: "{{ cryme_tls_algo is search('(?i)TLS1\\.3') and cryme_tls_algo is not search('1\\.2') }}"
+    hybrid_kex: "{{ cryme_kex_algo is search('(?i)MLKEM|X25519') }}"
+    client_hybrid: "{{ cryme_client_kex is search('(?i)MLKEM|X25519') }}"
+
+- name: Choose active certificate basename
+  ansible.builtin.set_fact:
+    active_cert_basename: "{{ 'migrated_ecdsa' if use_mldsa_cert else 'classic_rsa' }}"
+
+- name: Generate classic RSA certificate (live openssl)
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -days 3650 -newkey rsa:2048
+      -keyout {{ cert_dir }}/classic_rsa.key
+      -out {{ cert_dir }}/classic_rsa.crt
+      -subj "/CN=CRYME Live RSA/O=CRYME/C=DE"
+    creates: "{{ cert_dir }}/classic_rsa.crt"
+
+- name: Generate migrated ECDSA certificate (ML-DSA stand-in, live openssl)
+  ansible.builtin.command:
+    cmd: >-
+      openssl ecparam -genkey -name prime256v1
+      -out {{ cert_dir }}/migrated_ecdsa.key
+    creates: "{{ cert_dir }}/migrated_ecdsa.key"
+
+- name: Sign ECDSA certificate
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -days 3650
+      -key {{ cert_dir }}/migrated_ecdsa.key
+      -out {{ cert_dir }}/migrated_ecdsa.crt
+      -subj "/CN=CRYME Live ML-DSA Demo/O=CRYME/C=DE"
+    creates: "{{ cert_dir }}/migrated_ecdsa.crt"
+
+- name: Set nginx certificate paths
+  ansible.builtin.set_fact:
+    ssl_certificate: "/etc/nginx/certs/{{ active_cert_basename }}.crt"
+    ssl_certificate_key: "/etc/nginx/certs/{{ active_cert_basename }}.key"
+
+- name: Set nginx protocol and cipher suite
+  ansible.builtin.set_fact:
+    ssl_protocols: "{{ 'TLSv1.3' if tls13_only else 'TLSv1.2 TLSv1.3' }}"
+    ssl_ciphers: >-
+      {{
+        'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256' if tls13_only else
+        ('ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-CHACHA20-POLY1305' if hybrid_kex else
+        'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:AES128-GCM-SHA256:AES256-GCM-SHA384')
+      }}
+
+- name: Set CRYME profile labels
+  ansible.builtin.set_fact:
+    cryme_tls_profile: >-
+      {{
+        'tls13-only' if tls13_only else
+        ('hybrid-kex-mldsa-cert' if (hybrid_kex and use_mldsa_cert) else
+        ('mldsa-cert' if use_mldsa_cert else
+        ('hybrid-kex-classic-cert' if hybrid_kex else 'classic-rsa-ecdhe')))
+      }}
+    client_profile: "{{ 'hybrid-mlkem768' if client_hybrid else 'classic-ecdhe' }}"
+    client_expect_kex: "{{ 'X25519_MLKEM768' if client_hybrid else 'ECDHE' }}"
+    client_curl_tlsflags: "{{ '--tlsv1.3 --tls-max 1.3' if tls13_only else '--tlsv1.2 --tls-max 1.3' }}"
+
+- name: Deploy live runtime state (API /api/status)
+  ansible.builtin.template:
+    src: runtime.json.j2
+    dest: "{{ runtime_state_path }}"
+    mode: "0644"
+
+- name: Deploy live data endpoint (API /api/data)
+  ansible.builtin.template:
+    src: data.json.j2
+    dest: "{{ playbook_dir }}/../state/data.json"
+    mode: "0644"
+
+- name: Deploy nginx TLS configuration (live reverse proxy)
+  ansible.builtin.template:
+    src: tls.conf.j2
+    dest: "{{ nginx_config_path }}"
+    mode: "0644"
+  notify: Reload nginx inside Docker container
+
+- name: Deploy Client_Browser curl expectations
+  ansible.builtin.template:
+    src: client_expect.env.j2
+    dest: "{{ client_config_path }}"
+    mode: "0644"
+
+- name: Log CRYME live service deploy summary
+  ansible.builtin.debug:
+    msg:
+      - "CRYME LIVE deploy step {{ migration_step }}"
+      - "TLS profile: {{ cryme_tls_profile }}"
+      - "Active cert: {{ active_cert_basename }}"
+      - "API state: {{ runtime_state_path }}"
+      - "Verify: curl -sk https://127.0.0.1:8443/api/status"

@@ -1,0 +1,260 @@
+CRYME Live Migration Demo Run — 2026-07-09T19:28:22+02:00
+========================================
+
+## 0. INIT
+
+[32m[+] Database initialized from webserver_pqc_twin.yaml[0m
+
+
+## BASELINE — API status
+{
+  "migration_step": 0,
+  "profile": "classic-rsa-ecdhe",
+  "service": "cryme-api",
+  "algorithms": {
+    "Webserver_Classic.Cert_RSA2048": "RSA-2048",
+    "Webserver_Classic.KeyExchange_ECDHE": "ECDHE",
+    "Webserver_Classic.TLS_1.2_/_1.3_Communication": "TLS1.2/1.3",
+    "Client_Browser.KeyExchange_ECDHE": "ECDHE"
+  },
+  "deployed_at": null
+}
+
+
+## BASELINE — TLS header
+HTTP/1.1 200 OK
+
+## BASELINE — TLS handshake
+subject=CN=CRYME Classic RSA, O=CRYME Demo, C=DE
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+
+## STEP 1 — migrate KEX (expect FAIL)
+
+[31m[-] MIGRATION STEP 1 FAILED![0m
+  Starting verification of PQC state...
+  Currently Migrated Nodes: [Webserver_Classic.KeyExchange_ECDHE]
+  [-] RUNTIME VERIFICATION FAILURE: Unmet structural dependencies detected!
+    [✗] Key 'Webserver_Classic.KeyExchange_ECDHE' is migrated to PQC, but its communicating endpoint 'Client_Browser.KeyExchange_ECDHE' is still Classic.
+  [-] Verification failed. Oracle Result: FAILURE (✗)
+
+Logs written to: [33mlogs/log_step_1.txt[0m
+
+
+## STEP 1 — tree
+
+🌲 PQC Migration Tree:
+└── [36m[Step 0] INIT (system_start) [35m(HEAD)[0m[0m
+    └── [31m[Step 1] FAILED (Failed to migrate Webserver_Classic.KeyExchange_ECDHE)[0m
+
+
+## STEP 2 — migrate KEX (expect SUCCESS)
+
+[32m[+] MIGRATION STEP 2 SUCCESSFUL![0m
+  Starting verification of PQC state...
+  Currently Migrated Nodes: [Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE]
+  [+] Service health check: TLS negotiability validated and successfully established.
+  [+] Cryptographic handshake: SECURE.
+  [+] Oracle Result: SUCCESS (✓)
+
+Playbook saved to: [33mplaybooks/migrate_KeyExchange_ECDHE_KeyExchange_ECDHE_to_X25519MLKEM768_step2.yml[0m
+Logs written to:    [33mlogs/log_step_2.txt[0m
+
+
+## STEP 2 — deploy to live nginx
+
+[+] Deploying CRYME TLS state for step 2 ...
+    Migrated nodes: Client_Browser.KeyExchange_ECDHE, Webserver_Classic.KeyExchange_ECDHE
+    Vars file:      deploy/vars/step_2.json
+
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: community.general.yaml has been deprecated. The plugin has been superseded by the the option `result_format=yaml` in callback plugin ansible.builtin.default from ansible-core 2.13 onwards. This feature will be removed from collection 'community.general' version 12.0.0.
+
+PLAY [Apply CRYME migration to TLS stack] **************************************
+
+TASK [cryme_tls : Compute TLS profile from CRYME target_algorithms] ************
+ok: [localhost]
+
+TASK [cryme_tls : Derive TLS flags] ********************************************
+ok: [localhost]
+
+TASK [cryme_tls : Choose active certificate basename] **************************
+ok: [localhost]
+
+TASK [cryme_tls : Generate classic RSA certificate (live openssl)] *************
+ok: [localhost]
+
+TASK [cryme_tls : Generate migrated ECDSA certificate (ML-DSA stand-in, live openssl)] ***
+ok: [localhost]
+
+TASK [cryme_tls : Sign ECDSA certificate] **************************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx certificate paths] *********************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx protocol and cipher suite] *************************
+ok: [localhost]
+
+TASK [cryme_tls : Set CRYME profile labels] ************************************
+ok: [localhost]
+
+TASK [cryme_tls : Deploy live runtime state (API /api/status)] *****************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy live data endpoint (API /api/data)] *******************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy nginx TLS configuration (live reverse proxy)] *********
+changed: [localhost]
+
+TASK [cryme_tls : Deploy Client_Browser curl expectations] *********************
+ok: [localhost]
+
+TASK [cryme_tls : Log CRYME live service deploy summary] ***********************
+ok: [localhost] => 
+  msg:
+  - CRYME LIVE deploy step 2
+  - 'TLS profile: hybrid-kex-classic-cert'
+  - 'Active cert: classic_rsa'
+  - 'API state: /home/admin/cryme/deploy/playbooks/../state/runtime.json'
+  - 'Verify: curl -sk https://127.0.0.1:8443/api/status'
+
+RUNNING HANDLER [cryme_tls : Reload nginx inside Docker container] *************
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/admin/cryme/deploy/roles/cryme_tls/handlers/main.yml:2:3
+
+1 ---
+2 - name: Reload nginx inside Docker container
+    ^ column 3
+
+fatal: [localhost]: FAILED! => changed=true 
+  cmd:
+  - docker
+  - exec
+  - cryme-nginx-classic
+  - nginx
+  - -s
+  - reload
+  delta: '0:00:00.012857'
+  end: '2026-07-09 19:28:26.489959'
+  msg: non-zero return code
+  rc: 1
+  start: '2026-07-09 19:28:26.477102'
+  stderr: 'permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.45/containers/cryme-nginx-classic/json": dial unix /var/run/docker.sock: connect: permission denied'
+  stderr_lines: <omitted>
+  stdout: ''
+  stdout_lines: <omitted>
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=14   changed=3    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+
+[-] Ansible deploy failed (exit 2).
+
+## STEP 2 — API status after deploy
+{
+    "migration_step": 2,
+    "profile": "hybrid-kex-classic-cert",
+    "service": "cryme-api",
+    "algorithms": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768"
+    },
+    "deployed_at": "2026-07-09T19:28:24+02:00"
+}
+
+
+## STEP 2 — TLS after deploy
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+
+## STEP 4 — migrate Cert ML-DSA-44
+
+[32m[+] MIGRATION STEP 3 SUCCESSFUL![0m
+  Starting verification of PQC state...
+  Currently Migrated Nodes: [Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE, Webserver_Classic.Cert_RSA2048]
+  [+] Service health check: TLS negotiability validated and successfully established.
+  [+] Cryptographic handshake: SECURE.
+  [+] Oracle Result: SUCCESS (✓)
+
+Playbook saved to: [33mplaybooks/migrate_Cert_RSA2048_to_MLDSA44_step3.yml[0m
+Logs written to:    [33mlogs/log_step_3.txt[0m
+
+
+## STEP 4 — deploy
+[-] Error: Migration step 4 not found.
+
+## STEP 4 — API + cert subject
+{
+    "migration_step": 2,
+    "profile": "hybrid-kex-classic-cert",
+    "service": "cryme-api",
+    "algorithms": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768"
+    },
+    "deployed_at": "2026-07-09T19:28:24+02:00"
+}
+subject=CN=CRYME Classic RSA, O=CRYME Demo, C=DE
+
+## STEP 6 — migrate TLS control TLS1.3
+
+[32m[+] MIGRATION STEP 4 SUCCESSFUL![0m
+  Starting verification of PQC state...
+  Currently Migrated Nodes: [Webserver_Classic.Cert_RSA2048, Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE, Webserver_Classic.TLS_1.2_/_1.3_Communication]
+  [+] Service health check: TLS negotiability validated and successfully established.
+  [+] Cryptographic handshake: SECURE.
+  [+] Oracle Result: SUCCESS (✓)
+
+Playbook saved to: [33mplaybooks/migrate_3_Communication_to_TLS13_step4.yml[0m
+Logs written to:    [33mlogs/log_step_4.txt[0m
+
+
+## STEP 6 — deploy
+[-] Error: Migration step 6 not found.
+
+## STEP 6 — final API status
+{
+    "migration_step": 2,
+    "profile": "hybrid-kex-classic-cert",
+    "service": "cryme-api",
+    "algorithms": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768"
+    },
+    "deployed_at": "2026-07-09T19:28:24+02:00"
+}
+{
+    "message": "CRYME live service response",
+    "migration_step": 2,
+    "tls_profile": "hybrid-kex-classic-cert",
+    "crypto_state": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768"
+    }
+}
+
+## STEP 6 — final TLS
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+
+## FINAL — migration tree
+
+🌲 PQC Migration Tree:
+└── [36m[Step 0] INIT (system_start)[0m
+    ├── [31m[Step 1] FAILED (Failed to migrate Webserver_Classic.KeyExchange_ECDHE)[0m
+    └── [32m[Step 2] SUCCESS (Migrated Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE to X25519_MLKEM768, X25519_MLKEM768)[0m
+        └── [32m[Step 3] SUCCESS (Migrated Webserver_Classic.Cert_RSA2048 to ML-DSA-44)[0m
+            └── [32m[Step 4] SUCCESS (Migrated Webserver_Classic.TLS_1.2_/_1.3_Communication to TLS1.3) [35m(HEAD)[0m[0m
+
+
+## FINAL — diff step 6
+
+--- step 5 (before)
++++ step 6 (after)
+
+ (no changes)
+
+
+LOG SAVED: /home/admin/cryme/logs/demo_run_20260709_192822.txt

@@ -1,20 +1,22 @@
 # CRYME University Server Deployment Plan
 
-> Saved plan for deploying CRYME on a Linux university server with Docker, a real TLS dummy stack (nginx + client), and Ansible-driven migration. Implement when ready — not yet built.
+> Saved plan for deploying CRYME on a Linux university server with Docker, a real TLS dummy stack (nginx + client), and Ansible-driven migration.
 
 **Related docs:** [CLI_GUIDE.md](CLI_GUIDE.md) · [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) · [migration_demo_commands.md](migration_demo_commands.md)
+
+**University proxy (all protocols):** `http://proxy.cs.hs-rm.de:8080` — configured in `deploy/install_prerequisites.sh` for apt, Docker daemon, and npm. See [Docker proxy docs](https://docs.docker.com/engine/daemon/proxy/).
 
 ---
 
 ## Implementation checklist
 
-- [ ] **Phase A:** `deploy/docker-compose.yml` (Memgraph + nginx-classic + curl-client)
-- [ ] **Phase A:** `deploy/install_prerequisites.sh`, `deploy/verify_tls.sh`
-- [ ] **Phase B:** `deploy/roles/cryme_tls/` (node → nginx task mapping)
-- [ ] **Phase B:** `deploy/inventory/hosts.ini`, `deploy/ansible.cfg`
-- [ ] **Phase B:** Extend `web_app/oracle.js` — `include_role: cryme_tls`, configurable hosts
-- [ ] **Phase B:** `cryme deploy step=N` (+ optional `cryme verify tls`)
-- [ ] **Phase B:** `deploy/run_demo.sh` (migrate → deploy → verify loop)
+- [x] **Phase A:** `deploy/docker-compose.yml` (Memgraph + nginx-classic + curl-client)
+- [x] **Phase A:** `deploy/install_prerequisites.sh`, `deploy/verify_tls.sh`
+- [x] **Phase B:** `deploy/roles/cryme_tls/` (node → nginx task mapping)
+- [x] **Phase B:** `deploy/inventory/hosts.ini`, `deploy/ansible.cfg`
+- [x] **Phase B:** Extend `web_app/oracle.js` — `include_role: cryme_tls`, configurable hosts
+- [x] **Phase B:** `cryme deploy step=N` (+ `cryme verify tls`)
+- [x] **Phase B:** `deploy/run_demo.sh` (migrate → deploy → verify loop)
 - [ ] **Phase C (optional):** OQS nginx container for hybrid PQC-TLS
 
 ---
@@ -204,25 +206,29 @@ Optional: `deploy_target: nginx-classic` pro Component in YAML, sonst `deploy/ho
 ## Demo-Ablauf (CLI + Ansible + TLS-Verify)
 
 ```bash
-# Setup (einmalig)
+# Setup (einmalig) — setzt Proxy http://proxy.cs.hs-rm.de:8080 für apt/Docker/npm
 sudo bash deploy/install_prerequisites.sh
-docker compose -f deploy/docker-compose.yml up -d
 cd web_app && npm install && cd ..
 node cryme init
 
 # Baseline: klassisches TLS
-bash deploy/verify_tls.sh baseline
+node cryme verify tls baseline
+# oder: bash deploy/verify_tls.sh baseline
 
 # CRYME Migration + Deploy pro Step
 node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # fail
 node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # success
 node cryme deploy step=2
-bash deploy/verify_tls.sh step=2
+node cryme verify tls step=2
 
 # Steps 4–6 Cert, TLS Control ...
 node cryme show tree
 node cryme show diff step=6
-bash deploy/verify_tls.sh step=6
+node cryme deploy step=6
+node cryme verify tls step=6
+
+# Vollständige Demo-Schleife
+bash deploy/run_demo.sh
 ```
 
 ---

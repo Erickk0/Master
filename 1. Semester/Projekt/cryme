@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 
 const path = require('path');
+const fs = require('fs');
+const { spawnSync } = require('child_process');
 module.paths.push(path.join(__dirname, 'web_app', 'node_modules'));
+
+const PROJECT_ROOT = __dirname;
+const DEPLOY_ROOT = process.env.CRYME_DEPLOY_ROOT || path.join(PROJECT_ROOT, 'deploy');
 
 const {
   driver,
@@ -12,7 +17,9 @@ const {
   renderGraphAscii,
   renderStepDiffAscii,
   renderStepShowAscii,
-  getHeadStep
+  getHeadStep,
+  getStepDeployInfo,
+  resetLiveServiceState
 } = require('./web_app/oracle');
 
 function printUsage() {
@@ -27,6 +34,9 @@ Usage:
   cryme show diff step=<N>                   Show step diff (like git diff).
   cryme migrate id=<id>[,id2,...] <algo>     Migrate one or more nodes (shared algorithm).
   cryme migrate id=<id>:<algo> [id=<id2>:<algo2> ...]  Per-node algorithms.
+  cryme deploy step=<N>                        Deploy TLS stack for successful step N (Ansible).
+  cryme verify tls [step=<N>|baseline]         Run deploy/verify_tls.sh handshake proof.
+  cryme verify service [step=<N>|baseline]     Verify live cryme-api + TLS after deploy.
   cryme init                                 Reset DB and reload digital twin from YAML.
 
 Examples:
@@ -38,6 +48,8 @@ Examples:
   cryme migrate id=355 TLS1.3
   cryme migrate id=359,362 X25519_MLKEM768
   cryme migrate id=Webserver_Classic.KeyExchange_ECDHE:X25519_MLKEM768 id=Client_Browser.KeyExchange_ECDHE:X25519_MLKEM768
+  cryme deploy step=2
+  cryme verify tls step=2
 
 Note: 'show system' is deprecated — use 'show node'.
 `);
@@ -300,13 +312,118 @@ function parseMigrateTargets(args) {
   return { targets };
 }
 
+async function runDeploy(args) {
+  const stepNum = parseStepArg(args);
+  if (stepNum === null || isNaN(stepNum)) {
+    console.error("[-] Error: Missing or invalid step=N argument.");
+    console.error("    Usage: cryme deploy step=2");
+    process.exit(1);
+  }
+
+  const session = driver.session();
+  try {
+    const info = await getStepDeployInfo(session, stepNum);
+    if (info.error) {
+      console.error(`[-] Error: ${info.error}`);
+      process.exit(1);
+    }
+
+    const varsDir = path.join(DEPLOY_ROOT, 'vars');
+    if (!fs.existsSync(varsDir)) {
+      fs.mkdirSync(varsDir, { recursive: true });
+    }
+    const varsFile = path.join(varsDir, `step_${stepNum}.json`);
+    fs.writeFileSync(varsFile, JSON.stringify(info.deployVars, null, 2), 'utf8');
+
+    const ansibleCfg = path.join(DEPLOY_ROOT, 'ansible.cfg');
+    const inventory = path.join(DEPLOY_ROOT, 'inventory', 'hosts.ini');
+    const playbook = path.join(DEPLOY_ROOT, 'playbooks', 'apply_tls.yml');
+
+    if (!fs.existsSync(playbook)) {
+      console.error(`[-] Error: Deploy playbook not found at ${playbook}`);
+      process.exit(1);
+    }
+
+    console.log(`\n[+] Deploying CRYME TLS state for step ${stepNum} ...`);
+    console.log(`    Migrated nodes: ${info.deployVars.migrated_nodes.join(', ')}`);
+    console.log(`    Vars file:      deploy/vars/step_${stepNum}.json\n`);
+
+    const result = spawnSync('ansible-playbook', [
+      '-i', inventory,
+      playbook,
+      '-e', `@${varsFile}`
+    ], {
+      cwd: PROJECT_ROOT,
+      env: { ...process.env, ANSIBLE_CONFIG: ansibleCfg },
+      stdio: 'inherit'
+    });
+
+    if (result.status !== 0) {
+      console.error(`\n[-] Ansible deploy failed (exit ${result.status ?? 'unknown'}).`);
+      process.exit(result.status || 1);
+    }
+
+    console.log(`\n\x1b[32m[+] TLS deploy for step ${stepNum} completed.\x1b[0m`);
+    console.log(`    Verify: node cryme verify service step=${stepNum}\n`);
+    process.exit(0);
+  } catch (err) {
+    console.error("[-] Error during deploy: ", err.message);
+    process.exit(1);
+  } finally {
+    await session.close();
+  }
+}
+
+function runVerifyTls(args) {
+  runVerifyScript('verify_tls.sh', args);
+}
+
+function runVerifyService(args) {
+  runVerifyScript('verify_service.sh', args);
+}
+
+function runVerifyScript(scriptName, args) {
+  const verifyScript = path.join(DEPLOY_ROOT, scriptName);
+  if (!fs.existsSync(verifyScript)) {
+    console.error(`[-] Error: verify script not found at ${verifyScript}`);
+    process.exit(1);
+  }
+
+  let mode = 'baseline';
+  const stepNum = parseStepArg(args);
+  if (stepNum !== null && !isNaN(stepNum)) {
+    mode = `step=${stepNum}`;
+  } else if (args.includes('baseline')) {
+    mode = 'baseline';
+  }
+
+  const result = spawnSync('bash', [verifyScript, mode], {
+    cwd: PROJECT_ROOT,
+    stdio: 'inherit'
+  });
+  process.exit(result.status === 0 ? 0 : (result.status || 1));
+}
+
 async function runInit() {
   const session = driver.session();
   try {
     await initDatabase(session);
-    console.log("\n\x1b[32m[+] Database initialized from webserver_pqc_twin.yaml\x1b[0m\n");
+    console.log("\n\x1b[32m[+] Memgraph graph reset from webserver_pqc_twin.yaml\x1b[0m");
+
+    const liveReset = resetLiveServiceState({
+      log: (msg) => console.log(`\x1b[32m${msg}\x1b[0m`)
+    });
+    if (!liveReset.success) {
+      console.error(`\x1b[33m[!] Live service reset failed: ${liveReset.error}\x1b[0m`);
+      process.exit(1);
+    }
+    if (liveReset.warning) {
+      console.log(`\x1b[33m[!] ${liveReset.warning}\x1b[0m`);
+    }
+    console.log("\n\x1b[32m[+] Live service reset to baseline (step 0, classic TLS)\x1b[0m");
+    console.log("    Verify: curl -sk https://127.0.0.1:8443/api/status\n");
   } catch (err) {
-    console.error("[-] Error initializing database: ", err.message);
+    console.error("[-] Error initializing: ", err.message);
     process.exit(1);
   } finally {
     await session.close();
@@ -385,6 +502,12 @@ if (command === 'show' && args[1] === 'system') {
   showDiff(args.slice(2)).then(() => process.exit(0));
 } else if (command === 'init') {
   runInit().then(() => process.exit(0));
+} else if (command === 'deploy') {
+  runDeploy(args.slice(1));
+} else if (command === 'verify' && args[1] === 'tls') {
+  runVerifyTls(args.slice(2));
+} else if (command === 'verify' && args[1] === 'service') {
+  runVerifyService(args.slice(2));
 } else if (command === 'migrate') {
   runMigrate(args.slice(1));
 } else {

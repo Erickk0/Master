@@ -1,0 +1,26 @@
+# Maps digital-twin graph nodes to live Docker services on the university server.
+#
+# Graph node (Memgraph)  →  physical target
+# Used by cryme_tls Ansible role and verify scripts.
+
+services:
+  Webserver_Classic:
+    deploy_target: cryme-nginx-classic
+    type: nginx_tls
+    config_path: deploy/nginx/live/tls.conf
+    cert_path: deploy/nginx/certs
+    api_state: deploy/state/runtime.json
+
+  Client_Browser:
+    deploy_target: cryme-curl-client
+    type: tls_client
+    config_path: deploy/client/expect.env
+
+runtime_state:
+  path: deploy/state/runtime.json
+  updated_by: cryme_tls
+
+live_endpoints:
+  tls: "https://127.0.0.1:8443"
+  api_status: "https://127.0.0.1:8443/api/status"
+  api_data: "https://127.0.0.1:8443/api/data"

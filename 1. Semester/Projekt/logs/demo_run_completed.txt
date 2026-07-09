@@ -1,0 +1,213 @@
+=== DEPLOY STEP 3 (Cert ML-DSA-44) ===
+
+[+] Deploying CRYME TLS state for step 3 ...
+    Migrated nodes: Client_Browser.KeyExchange_ECDHE, Webserver_Classic.Cert_RSA2048, Webserver_Classic.KeyExchange_ECDHE
+    Vars file:      deploy/vars/step_3.json
+
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: community.general.yaml has been deprecated. The plugin has been superseded by the the option `result_format=yaml` in callback plugin ansible.builtin.default from ansible-core 2.13 onwards. This feature will be removed from collection 'community.general' version 12.0.0.
+
+PLAY [Apply CRYME migration to TLS stack] **************************************
+
+TASK [cryme_tls : Compute TLS profile from CRYME target_algorithms] ************
+ok: [localhost]
+
+TASK [cryme_tls : Derive TLS flags] ********************************************
+ok: [localhost]
+
+TASK [cryme_tls : Choose active certificate basename] **************************
+ok: [localhost]
+
+TASK [cryme_tls : Generate classic RSA certificate (live openssl)] *************
+ok: [localhost]
+
+TASK [cryme_tls : Generate migrated ECDSA certificate (ML-DSA stand-in, live openssl)] ***
+ok: [localhost]
+
+TASK [cryme_tls : Sign ECDSA certificate] **************************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx certificate paths] *********************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx protocol and cipher suite] *************************
+ok: [localhost]
+
+TASK [cryme_tls : Set CRYME profile labels] ************************************
+ok: [localhost]
+
+TASK [cryme_tls : Deploy live runtime state (API /api/status)] *****************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy live data endpoint (API /api/data)] *******************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy nginx TLS configuration (live reverse proxy)] *********
+changed: [localhost]
+
+TASK [cryme_tls : Deploy Client_Browser curl expectations] *********************
+changed: [localhost]
+
+TASK [cryme_tls : Log CRYME live service deploy summary] ***********************
+ok: [localhost] => 
+  msg:
+  - CRYME LIVE deploy step 3
+  - 'TLS profile: hybrid-kex-mldsa-cert'
+  - 'Active cert: migrated_ecdsa'
+  - 'API state: /home/admin/cryme/deploy/playbooks/../state/runtime.json'
+  - 'Verify: curl -sk https://127.0.0.1:8443/api/status'
+
+RUNNING HANDLER [cryme_tls : Reload nginx inside Docker container] *************
+changed: [localhost]
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=15   changed=5    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+[32m[+] TLS deploy for step 3 completed.[0m
+    Verify: node cryme verify service step=3
+
+
+=== API after step 3 ===
+{
+    "migration_step": 3,
+    "profile": "hybrid-kex-mldsa-cert",
+    "service": "cryme-api",
+    "algorithms": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.Cert_RSA2048": "ML-DSA-44",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768"
+    },
+    "deployed_at": "2026-07-09T19:28:39+02:00"
+}
+subject=CN=CRYME ML-DSA Demo, O=CRYME Demo, C=DE
+
+=== DEPLOY STEP 4 (TLS 1.3 only) ===
+
+[+] Deploying CRYME TLS state for step 4 ...
+    Migrated nodes: Client_Browser.KeyExchange_ECDHE, Webserver_Classic.Cert_RSA2048, Webserver_Classic.KeyExchange_ECDHE, Webserver_Classic.TLS_1.2_/_1.3_Communication
+    Vars file:      deploy/vars/step_4.json
+
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: community.general.yaml has been deprecated. The plugin has been superseded by the the option `result_format=yaml` in callback plugin ansible.builtin.default from ansible-core 2.13 onwards. This feature will be removed from collection 'community.general' version 12.0.0.
+
+PLAY [Apply CRYME migration to TLS stack] **************************************
+
+TASK [cryme_tls : Compute TLS profile from CRYME target_algorithms] ************
+ok: [localhost]
+
+TASK [cryme_tls : Derive TLS flags] ********************************************
+ok: [localhost]
+
+TASK [cryme_tls : Choose active certificate basename] **************************
+ok: [localhost]
+
+TASK [cryme_tls : Generate classic RSA certificate (live openssl)] *************
+ok: [localhost]
+
+TASK [cryme_tls : Generate migrated ECDSA certificate (ML-DSA stand-in, live openssl)] ***
+ok: [localhost]
+
+TASK [cryme_tls : Sign ECDSA certificate] **************************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx certificate paths] *********************************
+ok: [localhost]
+
+TASK [cryme_tls : Set nginx protocol and cipher suite] *************************
+ok: [localhost]
+
+TASK [cryme_tls : Set CRYME profile labels] ************************************
+ok: [localhost]
+
+TASK [cryme_tls : Deploy live runtime state (API /api/status)] *****************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy live data endpoint (API /api/data)] *******************
+changed: [localhost]
+
+TASK [cryme_tls : Deploy nginx TLS configuration (live reverse proxy)] *********
+changed: [localhost]
+
+TASK [cryme_tls : Deploy Client_Browser curl expectations] *********************
+changed: [localhost]
+
+TASK [cryme_tls : Log CRYME live service deploy summary] ***********************
+ok: [localhost] => 
+  msg:
+  - CRYME LIVE deploy step 4
+  - 'TLS profile: tls13-only'
+  - 'Active cert: migrated_ecdsa'
+  - 'API state: /home/admin/cryme/deploy/playbooks/../state/runtime.json'
+  - 'Verify: curl -sk https://127.0.0.1:8443/api/status'
+
+RUNNING HANDLER [cryme_tls : Reload nginx inside Docker container] *************
+[ERROR]: Task failed: Module failed: non-zero return code
+Origin: /home/admin/cryme/deploy/roles/cryme_tls/handlers/main.yml:2:3
+
+1 ---
+2 - name: Reload nginx inside Docker container
+    ^ column 3
+
+fatal: [localhost]: FAILED! => changed=true 
+  cmd:
+  - docker
+  - exec
+  - cryme-nginx-classic
+  - nginx
+  - -s
+  - reload
+  delta: '0:00:00.059516'
+  end: '2026-07-09 19:28:44.417076'
+  msg: non-zero return code
+  rc: 1
+  start: '2026-07-09 19:28:44.357560'
+  stderr: |-
+    2026/07/09 17:28:44 [emerg] 131#131: SSL_CTX_set_cipher_list("TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256") failed (SSL: error:0A0000B9:SSL routines::no cipher match)
+    nginx: [emerg] SSL_CTX_set_cipher_list("TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256") failed (SSL: error:0A0000B9:SSL routines::no cipher match)
+  stderr_lines: <omitted>
+  stdout: ''
+  stdout_lines: <omitted>
+
+PLAY RECAP *********************************************************************
+localhost                  : ok=14   changed=4    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0   
+
+
+[-] Ansible deploy failed (exit 2).
+
+=== API after step 4 ===
+{
+    "migration_step": 4,
+    "profile": "tls13-only",
+    "service": "cryme-api",
+    "algorithms": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.Cert_RSA2048": "ML-DSA-44",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.TLS_1.2_/_1.3_Communication": "TLS1.3"
+    },
+    "deployed_at": "2026-07-09T19:28:42+02:00"
+}
+{
+    "message": "CRYME live service response",
+    "migration_step": 4,
+    "tls_profile": "tls13-only",
+    "crypto_state": {
+        "Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.Cert_RSA2048": "ML-DSA-44",
+        "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768",
+        "Webserver_Classic.TLS_1.2_/_1.3_Communication": "TLS1.3"
+    }
+}
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+
+=== FINAL TREE ===
+
+🌲 PQC Migration Tree:
+└── [36m[Step 0] INIT (system_start)[0m
+    ├── [31m[Step 1] FAILED (Failed to migrate Webserver_Classic.KeyExchange_ECDHE)[0m
+    └── [32m[Step 2] SUCCESS (Migrated Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE to X25519_MLKEM768, X25519_MLKEM768)[0m
+        └── [32m[Step 3] SUCCESS (Migrated Webserver_Classic.Cert_RSA2048 to ML-DSA-44)[0m
+            └── [32m[Step 4] SUCCESS (Migrated Webserver_Classic.TLS_1.2_/_1.3_Communication to TLS1.3) [35m(HEAD)[0m[0m
+

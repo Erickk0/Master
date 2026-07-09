@@ -11,6 +11,8 @@ digital_twin:
       type: "server"
       phase: 1
       not_before: []
+      deploy_target: "cryme-nginx-classic"
+      backend_service: "nginx-live-api"
       
       security_controls:
         - control_name: "TLS 1.2 / 1.3 Communication"

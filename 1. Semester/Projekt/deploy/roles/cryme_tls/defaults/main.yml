@@ -1,0 +1,18 @@
+---
+nginx_container_name: cryme-nginx-classic
+api_container_name: cryme-api
+curl_container_name: cryme-curl-client
+nginx_config_path: "{{ playbook_dir }}/../nginx/live/tls.conf"
+client_config_path: "{{ playbook_dir }}/../client/expect.env"
+runtime_state_path: "{{ playbook_dir }}/../state/runtime.json"
+cert_dir: "{{ playbook_dir }}/../nginx/certs"
+migration_step: 0
+migrated_nodes: []
+target_algorithms: {}
+
+node_keyexchange_server: "Webserver_Classic.KeyExchange_ECDHE"
+node_keyexchange_client: "Client_Browser.KeyExchange_ECDHE"
+node_cert: "Webserver_Classic.Cert_RSA2048"
+node_tls_control: "Webserver_Classic.TLS_1.2_/_1.3_Communication"
+
+active_cert_basename: classic_rsa
