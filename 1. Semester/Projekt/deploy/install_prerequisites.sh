@@ -115,9 +115,17 @@ export HTTPS_PROXY="${PROXY_URL}"
 docker_compose -f deploy/docker-compose.yml pull
 docker_compose -f deploy/docker-compose.yml up -d
 
+# --- Shell alias: cryme command without 'node' prefix ---
+if [[ -n "${NPM_USER}" && "${NPM_USER}" != "root" ]]; then
+  sudo -u "${NPM_USER}" bash "${SCRIPT_DIR}/setup_shell.sh" "${PROJECT_ROOT}" || true
+else
+  bash "${SCRIPT_DIR}/setup_shell.sh" "${PROJECT_ROOT}" || true
+fi
+
 echo ""
 echo "[+] Prerequisites installed. Next steps:"
+echo "    source ~/.bashrc"
 echo "    cd \"${PROJECT_ROOT}\""
-echo "    node cryme init"
+echo "    cryme init"
 echo "    bash deploy/verify_tls.sh baseline"
 echo ""

@@ -1,5 +1,7 @@
 # CRYME Live Demo Cheat Sheet
 
+> **Full guide:** [GUIDE.md](GUIDE.md) · **Print this page** for the live meeting.
+
 **Server:** `ilmare.local.cs.hs-rm.de` · **Project:** `~/cryme` · **Live service:** `https://127.0.0.1:8443`
 
 Print this page and keep it open during the demo.
@@ -46,8 +48,8 @@ echo | openssl s_client -connect 127.0.0.1:8443 2>/dev/null | openssl x509 -noou
 ### 2. Reset graph **and live service** (10 sec)
 
 ```bash
-node cryme init
-node cryme show node
+cryme init
+cryme show node
 curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 ```
 
@@ -58,13 +60,13 @@ curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 ### 3. Oracle blocks unsafe migration (45 sec)
 
 ```bash
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
 ```
 
 **Expect:** ❌ `FAILED` — client browser still classic.
 
 ```bash
-node cryme show tree
+cryme show tree
 ```
 
 **Say:** “Hidden dependency between server and client — Oracle refuses unsafe migration.”
@@ -74,7 +76,7 @@ node cryme show tree
 ### 4. Oracle approves co-migration (30 sec)
 
 ```bash
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
 ```
 
 **Expect:** ✅ `SUCCESS` — both server + client migrated.
@@ -86,7 +88,7 @@ node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
 ### 5. Deploy to live nginx (60 sec) — **main proof**
 
 ```bash
-node cryme deploy step=2
+cryme deploy step=2
 curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 ```
 
@@ -105,8 +107,8 @@ curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 ### 6. Certificate migration on the wire (60 sec)
 
 ```bash
-node cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
-node cryme deploy step=3
+cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
+cryme deploy step=3
 echo | openssl s_client -connect 127.0.0.1:8443 2>/dev/null | openssl x509 -noout -subject
 ```
 
@@ -119,10 +121,10 @@ echo | openssl s_client -connect 127.0.0.1:8443 2>/dev/null | openssl x509 -noou
 ### 7. TLS 1.3 only (45 sec)
 
 ```bash
-node cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
-node cryme deploy step=4
+cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
+cryme deploy step=4
 curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
-node cryme show tree
+cryme show tree
 ```
 
 **Expect:** `profile: tls13-only`, all 4 nodes migrated, tree shows Step 4 as HEAD.
@@ -132,7 +134,7 @@ node cryme show tree
 ## Two views of the same truth (15 sec)
 
 ```bash
-node cryme show node          # Graph (Memgraph)
+cryme show node          # Graph (Memgraph)
 curl -sk https://127.0.0.1:8443/api/status   # Live service
 ```
 
@@ -145,9 +147,9 @@ curl -sk https://127.0.0.1:8443/api/status   # Live service
 | Problem | Fix |
 |---------|-----|
 | Connection refused on 8443 | `sudo docker-compose -f deploy/docker-compose.yml up -d` |
-| `cryme deploy` fails (docker) | Run with sudo: `sudo -E node cryme deploy step=N` |
-| Empty graph | `node cryme init` |
-| Wrong step number | `node cryme show tree` — use actual SUCCESS step numbers |
+| `cryme deploy` fails (docker) | Run with sudo: `sudo -E cryme deploy step=N` |
+| Empty graph | `cryme init` |
+| Wrong step number | `cryme show tree` — use actual SUCCESS step numbers |
 
 Quick check: `bash deploy/check_memgraph.sh`
 
@@ -166,10 +168,10 @@ Quick check: `bash deploy/check_memgraph.sh`
 | Live API status | `curl -sk https://127.0.0.1:8443/api/status` |
 | Live API data | `curl -sk https://127.0.0.1:8443/api/data` |
 | TLS cert check | `openssl s_client -connect 127.0.0.1:8443` |
-| Migration tree | `node cryme show tree` |
-| Step diff | `node cryme show diff step=4` |
+| Migration tree | `cryme show tree` |
+| Step diff | `cryme show diff step=4` |
 | Memgraph Lab | Port `3000` (Cursor forward or SSH tunnel) |
-| Full report | `DEMO_REPORT_FOR_PROFESSOR.md` |
+| Full report | `DEMO_REPORT_FOR.md` |
 
 ---
 

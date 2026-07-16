@@ -1,6 +1,6 @@
-# CRYME Live Migration Demo — Report for Professor
+# CRYME Live Migration Demo — Report
 
-**Date:** 2026-07-09  
+> **See [GUIDE.md](GUIDE.md) § End-to-End Demo** for the current demo script.  
 **Server:** `ilmare.local.cs.hs-rm.de` (Debian 13, Docker)  
 **Project path:** `/home/admin/cryme`  
 **Demo logs:** `logs/demo_run_20260709_192822.txt`, `logs/demo_run_completed.txt`
@@ -34,7 +34,7 @@ The demo proves three thesis claims in one pipeline:
 | `cryme-memgraph-lab` | Visual graph UI | `http://127.0.0.1:3000` (SSH tunnel) |
 | `cryme-nginx-classic` | **Live migratable HTTPS service** | `https://127.0.0.1:8443` |
 | `cryme-curl-client` | Simulates `Client_Browser` TLS client | Docker internal |
-| CRYME CLI (`node cryme`) | Oracle + migration control plane | Host |
+| CRYME CLI (`cryme`) | Oracle + migration control plane | Host |
 
 **Digital twin model:** `webserver_pqc_twin.yaml`  
 **Deploy mapping:** `deploy/host_mapping.yml` → graph nodes map to nginx + API state files
@@ -46,7 +46,7 @@ The demo proves three thesis claims in one pipeline:
 ### Phase 0 — Initialize
 
 ```bash
-node cryme init
+cryme init
 ```
 
 **Result:** Memgraph loaded 4 cryptographic nodes from YAML (all `classic`).
@@ -73,7 +73,7 @@ node cryme init
 ### Phase 1 — Hidden Dependency Trap (Step 1, FAIL)
 
 ```bash
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
 ```
 
 **Oracle result:** ❌ **FAILED**
@@ -97,7 +97,7 @@ Step 0 (INIT)
 ### Phase 2 — Co-Migration Success (Step 2, SUCCESS)
 
 ```bash
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768
 ```
 
 **Oracle result:** ✅ **SUCCESS** — SCC cluster expanded to include both:
@@ -110,7 +110,7 @@ Both migrated to `X25519_MLKEM768`. Ansible playbook generated.
 **Deploy to live service:**
 
 ```bash
-node cryme deploy step=2
+cryme deploy step=2
 ```
 
 **Ansible `cryme_tls` role applied:**
@@ -137,8 +137,8 @@ node cryme deploy step=2
 ### Phase 3 — Certificate Migration (Step 3, SUCCESS + DEPLOY)
 
 ```bash
-node cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
-node cryme deploy step=3
+cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
+cryme deploy step=3
 ```
 
 **Oracle result:** ✅ Certificate node migrated to ML-DSA-44 (NIST Level 1).
@@ -158,8 +158,8 @@ node cryme deploy step=3
 ### Phase 4 — TLS Control Migration (Step 4, SUCCESS + DEPLOY)
 
 ```bash
-node cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
-node cryme deploy step=4
+cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
+cryme deploy step=4
 ```
 
 **Oracle result:** ✅ Security control migrated to TLS 1.3 only.
@@ -283,21 +283,21 @@ Step 0 (INIT)
 cd ~/cryme
 sudo docker-compose -f deploy/docker-compose.yml up -d
 
-node cryme init
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # fail
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # success
-node cryme deploy step=2
-node cryme verify service step=2
+cryme init
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # fail
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # success
+cryme deploy step=2
+cryme verify service step=2
 
-node cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
-node cryme deploy step=3
+cryme migrate id=Webserver_Classic.Cert_RSA2048 ML-DSA-44
+cryme deploy step=3
 
-node cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
-node cryme deploy step=4
-node cryme verify service step=4
+cryme migrate id=Webserver_Classic.TLS_1.2_/_1.3_Communication TLS1.3
+cryme deploy step=4
+cryme verify service step=4
 
-node cryme show tree
-node cryme show diff step=4
+cryme show tree
+cryme show diff step=4
 ```
 
 Or automated: `bash deploy/run_demo.sh`
@@ -314,7 +314,7 @@ curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 echo | openssl s_client -connect 127.0.0.1:8443 2>/dev/null | openssl x509 -noout -subject
 
 # Graph migration history
-node cryme show tree
+cryme show tree
 ```
 
 ---

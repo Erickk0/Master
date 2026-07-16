@@ -551,10 +551,11 @@ function renderGraphAscii(state, options = {}) {
   const lines = [];
   const changedAtStep = options.changedAtStep || null;
   const headStep = options.headStep;
+  const title = options.title || 'CRYME DEPENDENCY GRAPH (ASCII)';
 
   lines.push('');
   lines.push('='.repeat(110));
-  lines.push(' '.repeat(35) + 'CRYME DEPENDENCY GRAPH (ASCII)');
+  lines.push(' '.repeat(Math.max(0, Math.floor((110 - title.length) / 2))) + title);
   if (state.step !== undefined) {
     lines.push(' '.repeat(40) + `State at step ${state.step}${headStep === state.step ? ' (HEAD)' : ''}`);
   }

@@ -1,6 +1,6 @@
 # CRYME Graph Versioning & Migration History
 
-This document explains how CRYME tracks the cryptographic dependency graph over time, how migration steps relate to graph state, and how the CLI exposes git-like introspection.
+> **See [GUIDE.md](GUIDE.md) § Graph Versioning** for the summary.
 
 ---
 
@@ -138,9 +138,9 @@ All assets `classic`. Server and browser key exchange connected via hidden globa
 
 Inspect with:
 ```bash
-node cryme show diff step=2
-node cryme show graph step=2
-node cryme show tree    # Step 2 marked (HEAD)
+cryme show diff step=2
+cryme show graph step=2
+cryme show tree    # Step 2 marked (HEAD)
 ```
 
 ---

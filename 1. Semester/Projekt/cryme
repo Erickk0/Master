@@ -29,6 +29,7 @@ function printUsage() {
 Usage:
   cryme show node [id=<id_or_name>]          Inspect cryptographic nodes (all or one).
   cryme show tree                            Display migration steps as ASCII tree (HEAD marked).
+  cryme show state [step=<N>] [--before]     System state at step N or HEAD (user-facing view).
   cryme show graph [step=<N>] [--before]     Dependency graph at step N or HEAD.
   cryme show step step=<N>                   Show step details (like git show).
   cryme show diff step=<N>                   Show step diff (like git diff).
@@ -43,6 +44,7 @@ Examples:
   cryme show node
   cryme show node id=Webserver_Classic.KeyExchange_ECDHE
   cryme show tree
+  cryme show state step=2
   cryme show graph step=2
   cryme show diff step=2
   cryme migrate id=355 TLS1.3
@@ -67,7 +69,8 @@ async function showNode(filterId) {
     let query = `
       MATCH (n)
       WHERE n:CryptoAsset OR n:SecurityControl
-      RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo
+      RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type,
+             n.status AS status, n.algorithm AS baseline, n.active_algorithm AS active
       ORDER BY n.id ASC
     `;
     let params = {};
@@ -77,14 +80,16 @@ async function showNode(filterId) {
         query = `
           MATCH (n)
           WHERE (n:CryptoAsset OR n:SecurityControl) AND (id(n) = $id OR n.id = $idStr)
-          RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo
+          RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type,
+                 n.status AS status, n.algorithm AS baseline, n.active_algorithm AS active
         `;
         params = { id: require('neo4j-driver').int(filterId), idStr: filterId };
       } else {
         query = `
           MATCH (n)
           WHERE (n:CryptoAsset OR n:SecurityControl) AND n.id = $id
-          RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type, n.status AS status, n.active_algorithm AS algo
+          RETURN id(n) AS db_id, n.id AS node_id, labels(n)[0] AS type,
+                 n.status AS status, n.algorithm AS baseline, n.active_algorithm AS active
         `;
         params = { id: filterId };
       }
@@ -97,26 +102,28 @@ async function showNode(filterId) {
       return;
     }
 
-    console.log("\n" + "=".repeat(110));
-    console.log(" ".repeat(42) + "🛡️  CRYME PQC NODE STATUS ORACLE  🛡️");
-    console.log("=".repeat(110));
+    console.log("\n" + "=".repeat(120));
+    console.log(" ".repeat(45) + "🛡️  CRYME PQC NODE STATUS ORACLE  🛡️");
+    console.log("=".repeat(120));
     console.log(
       " " +
       "ID".padEnd(8) + " | " +
       "Type".padEnd(16) + " | " +
       "Component".padEnd(20) + " | " +
-      "Asset / Control Name".padEnd(35) + " | " +
+      "Asset / Control Name".padEnd(30) + " | " +
       "Status".padEnd(12) + " | " +
-      "Algorithm"
+      "Baseline".padEnd(14) + " | " +
+      "Active"
     );
-    console.log("-".repeat(110));
+    console.log("-".repeat(120));
 
     res.records.forEach(rec => {
       const dbId = rec.get('db_id').toString();
       const nodeId = rec.get('node_id');
       const type = rec.get('type');
       const status = rec.get('status') || 'classic';
-      const algo = rec.get('algo') || '-';
+      const baseline = rec.get('baseline') || '-';
+      const active = rec.get('active') || '-';
 
       const parts = nodeId.split('.');
       const comp = parts[0] || '-';
@@ -129,12 +136,13 @@ async function showNode(filterId) {
         dbId.padEnd(8) + " | " +
         type.padEnd(16) + " | " +
         comp.padEnd(20) + " | " +
-        name.padEnd(35) + " | " +
+        name.padEnd(30) + " | " +
         statusColor.padEnd(21) + " | " +
-        algo
+        baseline.padEnd(14) + " | " +
+        active
       );
     });
-    console.log("=".repeat(110) + "\n");
+    console.log("=".repeat(120) + "\n");
   } catch (err) {
     console.error("[-] Error showing nodes: ", err.message);
   } finally {
@@ -220,6 +228,27 @@ async function showTree() {
     }
   } catch (err) {
     console.error("[-] Error showing tree: ", err.message);
+  } finally {
+    await session.close();
+  }
+}
+
+async function showState(args) {
+  const session = driver.session();
+  try {
+    const stepNum = parseStepArg(args);
+    const before = args.includes('--before');
+    const headStep = await getHeadStep(session);
+    const targetStep = stepNum !== null && !isNaN(stepNum) ? stepNum : headStep;
+
+    const state = await reconstructStateAtStep(session, targetStep, { before });
+    console.log(renderGraphAscii(state, {
+      headStep,
+      changedAtStep: before ? null : targetStep,
+      title: 'CRYME SYSTEM STATE (Systemzustand)'
+    }));
+  } catch (err) {
+    console.error("[-] Error showing state: ", err.message);
   } finally {
     await session.close();
   }
@@ -364,7 +393,7 @@ async function runDeploy(args) {
     }
 
     console.log(`\n\x1b[32m[+] TLS deploy for step ${stepNum} completed.\x1b[0m`);
-    console.log(`    Verify: node cryme verify service step=${stepNum}\n`);
+    console.log(`    Verify: cryme verify service step=${stepNum}\n`);
     process.exit(0);
   } catch (err) {
     console.error("[-] Error during deploy: ", err.message);
@@ -494,6 +523,8 @@ if (command === 'show' && args[1] === 'system') {
   showNode(idArg ? idArg.split('=')[1] : null).then(() => process.exit(0));
 } else if (command === 'show' && args[1] === 'tree') {
   showTree().then(() => process.exit(0));
+} else if (command === 'show' && args[1] === 'state') {
+  showState(args.slice(2)).then(() => process.exit(0));
 } else if (command === 'show' && args[1] === 'graph') {
   showGraph(args.slice(2)).then(() => process.exit(0));
 } else if (command === 'show' && args[1] === 'step') {

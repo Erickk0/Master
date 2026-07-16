@@ -1,7 +1,6 @@
 # CRYME Project: PQC Migration Oracle
-## Dynamic Dependency Discovery & Temporal Constraint Validation Report
 
-This document provides a formal scientific explanation of the simulator behavior observed during the post-quantum cryptography (PQC) migration run on the **Webserver Scenario** (representing baseline classic webservers, client browsers, and next-generation hybrid OQS Nginx servers).
+> **See [GUIDE.md](GUIDE.md)** for operations. This doc explains Oracle behaviour (SCC, implicit edges).
 
 ---
 

@@ -1,23 +1,18 @@
-# CRYME University Server Deployment Plan
+# CRYME University Server Deployment
 
-> Saved plan for deploying CRYME on a Linux university server with Docker, a real TLS dummy stack (nginx + client), and Ansible-driven migration.
+> **See [GUIDE.md](GUIDE.md)** for install and operations. This doc covers server architecture.
 
-**Related docs:** [CLI_GUIDE.md](CLI_GUIDE.md) · [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) · [migration_demo_commands.md](migration_demo_commands.md)
+**Related:** [CLI_GUIDE.md](CLI_GUIDE.md) · [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) · [migration_demo_commands.md](migration_demo_commands.md)
 
-**University proxy (all protocols):** `http://proxy.cs.hs-rm.de:8080` — configured in `deploy/install_prerequisites.sh` for apt, Docker daemon, and npm. See [Docker proxy docs](https://docs.docker.com/engine/daemon/proxy/).
+**University proxy:** `http://proxy.cs.hs-rm.de:8080` — configured in `deploy/install_prerequisites.sh`.
 
 ---
 
-## Implementation checklist
+## Implementation status
 
-- [x] **Phase A:** `deploy/docker-compose.yml` (Memgraph + nginx-classic + curl-client)
-- [x] **Phase A:** `deploy/install_prerequisites.sh`, `deploy/verify_tls.sh`
-- [x] **Phase B:** `deploy/roles/cryme_tls/` (node → nginx task mapping)
-- [x] **Phase B:** `deploy/inventory/hosts.ini`, `deploy/ansible.cfg`
-- [x] **Phase B:** Extend `web_app/oracle.js` — `include_role: cryme_tls`, configurable hosts
-- [x] **Phase B:** `cryme deploy step=N` (+ `cryme verify tls`)
-- [x] **Phase B:** `deploy/run_demo.sh` (migrate → deploy → verify loop)
-- [ ] **Phase C (optional):** OQS nginx container for hybrid PQC-TLS
+- [x] **Phase A:** Docker stack (Memgraph + nginx + curl-client)
+- [x] **Phase B:** Ansible `cryme_tls` role, live TLS deploy, `cryme deploy` + `cryme verify`
+- [ ] **Phase C (optional):** OQS nginx for real PQC handshakes on the wire
 
 ---
 
@@ -48,33 +43,18 @@ flowchart LR
 
 ---
 
-## Kann das der aktuelle CRYME-Stand?
+## Current capabilities (Phase A + B complete)
 
-### Was heute schon funktioniert (kein Server-Deploy nötig)
-
-| Fähigkeit | Status | Wo |
-|-----------|--------|-----|
-| Digital Twin aus YAML laden | Ja | `webserver_pqc_twin.yaml`, `cryme init` |
-| Abhängigkeitsgraph + Oracle (temporal, structural, variant) | Ja | `web_app/oracle.js` |
-| SCC Co-Migration, implizite Kanten entdecken | Ja | Step 1 fail → Step 2 success |
-| Migration History (tree, graph, diff, HEAD) | Ja | `cryme show tree/graph/diff/step` |
-| Multi-Node migrate, Playbook-Generierung | Ja | `cryme` |
-| Mapping Node → Ziel-Algorithmus in Playbook-Vars | Ja | `target_algorithms` in generierten YAMLs |
-
-**Fazit:** CRYME als **Migrations-Oracle und Planungs-Engine** ist demo-ready. Das Modell (Cert, KeyExchange, TLS Control, Browser) passt zum Webserver-Szenario.
-
-### Was heute noch NICHT funktioniert (Lücke)
-
-| Fähigkeit | Status | Problem |
-|-----------|--------|---------|
-| Echter TLS-Webserver | Nein | Kein nginx/Apache im Repo |
-| Playbook ändert TLS live | Nein | `generatePlaybookContent()` schreibt nur `/etc/pqc/keys_step_N.conf` (Kommentar-Datei) |
-| `pqc_crypto_daemon` | Nein | Fiktiver systemd-Service, existiert nicht |
-| `inventory/localhost` | Nein | Im CLI_GUIDE referenziert, fehlt im Repo |
-| Browser-Client TLS-Test | Nein | `Client_Browser` ist Graph-Knoten ohne echte Maschine |
-| Echtes PQC-TLS (ML-KEM, ML-DSA) | Nein | Kein OQS/OpenSSL 3 Provider, keine Zertifikatsgenerierung |
-
-**Fazit:** CRYME **entscheidet korrekt**, *was* wann migriert werden darf — aber die generierten Playbooks **führen die TLS-Migration am echten Webserver noch nicht aus**. Dafür brauchen wir die neue `deploy/`-Schicht (Phase B/C unten).
+| Capability | Status |
+|------------|--------|
+| Digital twin from YAML | Yes |
+| Oracle (SCC, implicit edges, temporal) | Yes |
+| Migration history (tree, state, diff, HEAD) | Yes |
+| Live nginx HTTPS on :8443 | Yes |
+| Ansible TLS deploy via `cryme deploy` | Yes |
+| curl-client browser simulation | Yes |
+| Independent TLS verification | Yes |
+| Real PQC handshakes (ML-KEM, ML-DSA on wire) | No — Phase C |
 
 ---
 
@@ -209,23 +189,23 @@ Optional: `deploy_target: nginx-classic` pro Component in YAML, sonst `deploy/ho
 # Setup (einmalig) — setzt Proxy http://proxy.cs.hs-rm.de:8080 für apt/Docker/npm
 sudo bash deploy/install_prerequisites.sh
 cd web_app && npm install && cd ..
-node cryme init
+cryme init
 
 # Baseline: klassisches TLS
-node cryme verify tls baseline
+cryme verify tls baseline
 # oder: bash deploy/verify_tls.sh baseline
 
 # CRYME Migration + Deploy pro Step
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # fail
-node cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # success
-node cryme deploy step=2
-node cryme verify tls step=2
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # fail
+cryme migrate id=Webserver_Classic.KeyExchange_ECDHE X25519_MLKEM768  # success
+cryme deploy step=2
+cryme verify tls step=2
 
 # Steps 4–6 Cert, TLS Control ...
-node cryme show tree
-node cryme show diff step=6
-node cryme deploy step=6
-node cryme verify tls step=6
+cryme show tree
+cryme show diff step=4
+cryme deploy step=4
+cryme verify tls step=4
 
 # Vollständige Demo-Schleife
 bash deploy/run_demo.sh
