@@ -471,7 +471,10 @@ deploy/
   verify_tls.sh                 TLS verification script
 playbooks/                      Generated migration playbooks
 logs/                           Oracle step logs
+docs/                           Detailed documentation
+assets/                         Thesis PDFs, figures, Typst sources
 webserver_pqc_twin.yaml         Webserver digital twin (active scenario)
+digital_twin.yaml               Automotive digital twin (paper scenario)
 GUIDE.md                        Main entry-point guide
 ```
 
@@ -482,7 +485,7 @@ GUIDE.md                        Main entry-point guide
 | Area | Current (Phase B) | Future (Phase C) |
 |------|-------------------|------------------|
 | PQC on the wire | ML-KEM/ML-DSA names map to classical OpenSSL TLS | OQS nginx for real PQC handshakes |
-| Scenarios | Webserver + Browser (live) | More digital twins |
+| Scenarios | Webserver + Browser (live), Automotive (YAML only) | More digital twins |
 | UI | CLI-first; optional web UI | Streamlit/dashboard |
 
 **Honest limitation to state in demos:**

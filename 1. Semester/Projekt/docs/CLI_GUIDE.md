@@ -1,6 +1,6 @@
 # CRYME Command-Line Interface (CLI) Guide
 
-> **See [GUIDE.md](GUIDE.md) § CLI Reference** for the full guide. This file is the CLI-only reference.
+> **See [GUIDE.md](../GUIDE.md) § CLI Reference** for the full guide. This file is the CLI-only reference.
 
 ---
 

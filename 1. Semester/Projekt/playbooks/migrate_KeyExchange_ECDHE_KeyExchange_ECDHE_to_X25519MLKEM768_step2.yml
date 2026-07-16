@@ -1,7 +1,7 @@
 # CRYME migration playbook (Step 2)
 # Deploy TLS stack: ANSIBLE_CONFIG=deploy/ansible.cfg ansible-playbook -i deploy/inventory/hosts.ini deploy/playbooks/apply_tls.yml \
 #   -e 'migration_step=2' -e @deploy/vars/step_2.json
-# Or use: node cryme deploy step=2
+# Or use: cryme deploy step=2
 # Nodes in this step: Webserver_Classic.KeyExchange_ECDHE, Client_Browser.KeyExchange_ECDHE
 - name: Migrate KeyExchange_ECDHE + KeyExchange_ECDHE to X25519_MLKEM768 (Step 2)
   hosts: webserver

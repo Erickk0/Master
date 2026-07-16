@@ -1,6 +1,6 @@
 # CRYME Live Demo Cheat Sheet
 
-> **Full guide:** [GUIDE.md](GUIDE.md) · **Print this page** for the live meeting.
+> **Full guide:** [GUIDE.md](../GUIDE.md) · **Print this page** for the live meeting.
 
 **Server:** `ilmare.local.cs.hs-rm.de` · **Project:** `~/cryme` · **Live service:** `https://127.0.0.1:8443`
 

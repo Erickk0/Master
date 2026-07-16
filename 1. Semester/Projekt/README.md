@@ -16,24 +16,24 @@ cryme verify tls baseline
 
 ## Live demo (5 min)
 
-Print [LIVE_DEMO_CHEAT_SHEET.md](LIVE_DEMO_CHEAT_SHEET.md) and run on `ilmare.local.cs.hs-rm.de`.
+Print [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) and run on `ilmare.local.cs.hs-rm.de`.
 
 ## Documentation
 
 | Doc | Purpose |
 |-----|---------|
 | [**GUIDE.md**](GUIDE.md) | **Main guide** — everything in one place |
-| [LIVE_DEMO_CHEAT_SHEET.md](LIVE_DEMO_CHEAT_SHEET.md) | One-page demo script |
-| [DOMAIN_ANALYSIS.md](DOMAIN_ANALYSIS.md) | Actors, views, use cases |
-| [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | ER diagram, naming rules |
-| [MIGRATION_STATES.md](MIGRATION_STATES.md) | System state per step |
-| [TLS_ALGORITHMS.md](TLS_ALGORITHMS.md) | TLS profiles, curl flags |
-| [CLI_GUIDE.md](CLI_GUIDE.md) | CLI reference |
-| [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) | Event sourcing, HEAD |
-| [DEMO_REPORT_FOR.md](DEMO_REPORT_FOR.md) | Professor demo report |
-| [LIVE_SERVICE.md](LIVE_SERVICE.md) | Live HTTPS architecture |
-| [SERVER_DEPLOYMENT.md](SERVER_DEPLOYMENT.md) | University server setup |
-| [migration_explanation.md](migration_explanation.md) | Oracle SCC behaviour |
+| [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) | One-page demo script |
+| [docs/DOMAIN_ANALYSIS.md](docs/DOMAIN_ANALYSIS.md) | Actors, views, use cases |
+| [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) | ER diagram, naming rules |
+| [docs/MIGRATION_STATES.md](docs/MIGRATION_STATES.md) | System state per step |
+| [docs/TLS_ALGORITHMS.md](docs/TLS_ALGORITHMS.md) | TLS profiles, curl flags |
+| [docs/CLI_GUIDE.md](docs/CLI_GUIDE.md) | CLI reference |
+| [docs/GRAPH_VERSIONING.md](docs/GRAPH_VERSIONING.md) | Event sourcing, HEAD |
+| [docs/DEMO_REPORT_FOR.md](docs/DEMO_REPORT_FOR.md) | Professor demo report |
+| [docs/LIVE_SERVICE.md](docs/LIVE_SERVICE.md) | Live HTTPS architecture |
+| [docs/SERVER_DEPLOYMENT.md](docs/SERVER_DEPLOYMENT.md) | University server setup |
+| [docs/migration_explanation.md](docs/migration_explanation.md) | Oracle SCC behaviour |
 
 ## Project layout
 
@@ -41,9 +41,13 @@ Print [LIVE_DEMO_CHEAT_SHEET.md](LIVE_DEMO_CHEAT_SHEET.md) and run on `ilmare.lo
 cryme/                    CLI orchestrator
 web_app/                  Oracle engine + optional web UI
 deploy/                   Docker, Ansible, TLS verification
-playbooks/                Generated Ansible migration playbooks
+playbooks/                Generated Ansible playbooks
 logs/                     Oracle step logs
-webserver_pqc_twin.yaml   Active digital twin (webserver scenario)
+docs/                     Detailed documentation
+assets/                   Thesis PDFs, figures, Typst sources
+webserver_pqc_twin.yaml   Active digital twin (webserver)
+digital_twin.yaml         Automotive scenario (paper/thesis)
+GUIDE.md                  Main entry-point guide
 ```
 
 ## Memgraph GUI
@@ -53,13 +57,6 @@ ssh -L 3000:127.0.0.1:3000 -L 7687:127.0.0.1:7687 admin@ilmare
 ```
 
 Open http://localhost:3000 → `bolt://localhost:7687` (no credentials).
-
-## Push to GitHub
-
-```bash
-export GITHUB_TOKEN="ghp_..."
-bash scripts/push_to_github.sh
-```
 
 ## Troubleshooting
 

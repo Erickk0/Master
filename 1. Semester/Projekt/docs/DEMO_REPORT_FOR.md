@@ -1,6 +1,6 @@
 # CRYME Live Migration Demo — Report
 
-> **See [GUIDE.md](GUIDE.md) § End-to-End Demo** for the current demo script.  
+> **See [GUIDE.md](../GUIDE.md) § End-to-End Demo** for the current demo script.  
 **Server:** `ilmare.local.cs.hs-rm.de` (Debian 13, Docker)  
 **Project path:** `/home/admin/cryme`  
 **Demo logs:** `logs/demo_run_20260709_192822.txt`, `logs/demo_run_completed.txt`

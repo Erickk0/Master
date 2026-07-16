@@ -1,6 +1,6 @@
 # CRYME Live Service Migration
 
-> **See [GUIDE.md](GUIDE.md) § Live Service** for the full picture.
+> **See [GUIDE.md](../GUIDE.md) § Live Service** for the full picture.
 
 CRYME migrates a **real running HTTPS service** on the university server.
 

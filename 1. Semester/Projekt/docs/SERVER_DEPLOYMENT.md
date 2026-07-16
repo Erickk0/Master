@@ -1,6 +1,6 @@
 # CRYME University Server Deployment
 
-> **See [GUIDE.md](GUIDE.md)** for install and operations. This doc covers server architecture.
+> **See [GUIDE.md](../GUIDE.md)** for install and operations. This doc covers server architecture.
 
 **Related:** [CLI_GUIDE.md](CLI_GUIDE.md) · [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) · [migration_demo_commands.md](migration_demo_commands.md)
 

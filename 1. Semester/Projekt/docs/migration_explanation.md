@@ -1,6 +1,6 @@
 # CRYME Project: PQC Migration Oracle
 
-> **See [GUIDE.md](GUIDE.md)** for operations. This doc explains Oracle behaviour (SCC, implicit edges).
+> **See [GUIDE.md](../GUIDE.md)** for operations. This doc explains Oracle behaviour (SCC, implicit edges).
 
 ---
 

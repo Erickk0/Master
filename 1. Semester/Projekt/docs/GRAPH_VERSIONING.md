@@ -1,6 +1,6 @@
 # CRYME Graph Versioning & Migration History
 
-> **See [GUIDE.md](GUIDE.md) § Graph Versioning** for the summary.
+> **See [GUIDE.md](../GUIDE.md) § Graph Versioning** for the summary.
 
 ---
 

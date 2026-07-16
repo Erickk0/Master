@@ -1,6 +1,6 @@
 # CRYME PQC Migration Demo Commands
 
-> **See [GUIDE.md](GUIDE.md) § End-to-End Demo** for the full walkthrough. This file is a quick command reference.
+> **See [GUIDE.md](../GUIDE.md) § End-to-End Demo** for the full walkthrough. This file is a quick command reference.
 
 Requires `source ~/.bashrc` so `cryme` works without the `node` prefix.
 
