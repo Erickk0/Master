@@ -1,0 +1,11 @@
+# Runtime / generated (keep baselines in git)
+deploy/vars/step_*.json
+deploy/nginx/certs/*.key
+
+# Node
+web_app/node_modules/
+
+# OS / macOS
+.DS_Store
+._*
+**/._*
