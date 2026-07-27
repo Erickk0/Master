@@ -2,16 +2,26 @@
 
 Orchestrator for planned PQC migrations: digital twin → Oracle validation → Ansible deploy → live HTTPS proof.
 
-**Start here:** [**GUIDE.md**](GUIDE.md) — comprehensive guide (install, domain model, CLI, demo, troubleshooting)
+**Start here:** [**INSTALL.md**](INSTALL.md) — local install from git (Mac/Linux) · [**GUIDE.md**](GUIDE.md) — full project guide
 
-## Quick start
+## Quick start (local Mac/Linux)
+
+```bash
+git clone <repo-url> cryme && cd cryme
+bash deploy/install_local.sh
+source ~/.zshrc          # or: source ~/.bashrc
+cryme init
+cryme verify baseline    # TLS + curl -sk https://127.0.0.1:8443/api/status
+```
+
+## Quick start (university server)
 
 ```bash
 cd ~/cryme
 sudo bash deploy/install_prerequisites.sh
 source ~/.bashrc
 cryme init
-cryme verify tls baseline
+cryme verify baseline
 ```
 
 ## Live demo (5 min)
@@ -22,6 +32,7 @@ Print [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) and run on 
 
 | Doc | Purpose |
 |-----|---------|
+| [**INSTALL.md**](INSTALL.md) | **Local install** — clone from git, Mac/Linux |
 | [**GUIDE.md**](GUIDE.md) | **Main guide** — everything in one place |
 | [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) | One-page demo script |
 | [docs/DOMAIN_ANALYSIS.md](docs/DOMAIN_ANALYSIS.md) | Actors, views, use cases |

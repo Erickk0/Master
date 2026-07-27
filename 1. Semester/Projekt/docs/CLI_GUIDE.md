@@ -152,13 +152,30 @@ Requires: Docker stack running (`deploy/docker-compose.yml`), Ansible installed.
 
 ---
 
-### `cryme verify tls [step=<N>|baseline]`
+### `cryme verify [step=<N>|baseline]`
 
-Runs `deploy/verify_tls.sh` — prints protocol, cipher, and certificate from `openssl` / `curl` (host + `curl-client` container).
+Runs `deploy/verify_tls.sh` — TLS handshake proof **and** live migration check via:
 
 ```bash
-cryme verify tls baseline
-cryme verify tls step=2
+curl -sk https://127.0.0.1:8443/api/status
+```
+
+When you pass `step=N` or `baseline`, the script checks that `migration_step` in the API response matches.
+
+```bash
+cryme verify baseline
+cryme verify step=2
+cryme verify tls step=2    # same as above
+```
+
+Use after `cryme deploy step=N` to confirm the live HTTPS service reflects the migration.
+
+### `cryme verify service [step=<N>|baseline]`
+
+Extended dump of `/api/status`, `/api/data`, TLS headers, and handshake (no strict step check).
+
+```bash
+cryme verify service step=2
 ```
 
 ---

@@ -81,7 +81,26 @@ flowchart TB
 
 ## 3. Installation & Setup
 
-### First-time server install
+### Local install (Mac / Linux, from git)
+
+See **[INSTALL.md](INSTALL.md)** — step-by-step for anyone cloning the repo locally.
+
+```bash
+git clone <repo-url> cryme && cd cryme
+bash deploy/install_local.sh
+source ~/.zshrc    # macOS — or ~/.bashrc on Linux
+cryme init
+cryme verify baseline
+```
+
+Verification includes TLS handshake **and** migration state:
+
+```bash
+curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
+cryme verify step=2    # fails if migration_step ≠ 2
+```
+
+### First-time server install (university)
 
 ```bash
 cd ~/cryme
@@ -250,8 +269,9 @@ All commands work as `cryme <command>` after `source ~/.bashrc`.
 | `cryme migrate id=NODE ALGO` | Migrate one or more nodes (shared algo) |
 | `cryme migrate id=N1:ALGO1 id=N2:ALGO2` | Per-node algorithms |
 | `cryme deploy step=N` | Deploy cumulative TLS state via Ansible |
-| `cryme verify tls [step=N\|baseline]` | openssl + curl handshake proof |
-| `cryme verify service [step=N\|baseline]` | Live API + TLS check |
+| `cryme verify [step=N\|baseline]` | TLS + `/api/status` migration check (recommended) |
+| `cryme verify tls [step=N\|baseline]` | Same as above |
+| `cryme verify service [step=N\|baseline]` | Extended API dump (`/api/status`, `/api/data`) |
 
 ### `show node` columns
 
@@ -356,13 +376,13 @@ Ansible role `cryme_tls` derives nginx profiles from migrated node algorithms.
 | `hybrid-kex-mldsa-cert` | ML-DSA | X25519_MLKEM768 | 1.2+1.3 | `--tlsv1.2 --tls-max 1.3` |
 | `tls13-only` | any | any | 1.3 only | `--tlsv1.3 --tls-max 1.3` |
 
-### Verify TLS independently
+### Verify TLS and migration state
 
 ```bash
-cryme verify tls baseline
-cryme verify tls step=2
+cryme verify baseline
+cryme verify step=2
 
-# Manual
+# Manual (same endpoint cryme verify uses)
 curl -sk https://127.0.0.1:8443/api/status | python3 -m json.tool
 echo | openssl s_client -connect 127.0.0.1:8443 2>&1 | grep -E 'Protocol|Cipher|subject='
 curl -skI https://127.0.0.1:8443/health | grep -i x-cryme-tls-profile

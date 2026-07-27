@@ -36,8 +36,9 @@ Usage:
   cryme migrate id=<id>[,id2,...] <algo>     Migrate one or more nodes (shared algorithm).
   cryme migrate id=<id>:<algo> [id=<id2>:<algo2> ...]  Per-node algorithms.
   cryme deploy step=<N>                        Deploy TLS stack for successful step N (Ansible).
-  cryme verify tls [step=<N>|baseline]         Run deploy/verify_tls.sh handshake proof.
-  cryme verify service [step=<N>|baseline]     Verify live cryme-api + TLS after deploy.
+  cryme verify [step=<N>|baseline]             TLS + /api/status migration check (recommended).
+  cryme verify tls [step=<N>|baseline]         Same as above (openssl + curl + api/status).
+  cryme verify service [step=<N>|baseline]     Extended live API dump (/api/status, /api/data).
   cryme init                                 Reset DB and reload digital twin from YAML.
 
 Examples:
@@ -51,6 +52,7 @@ Examples:
   cryme migrate id=359,362 X25519_MLKEM768
   cryme migrate id=Webserver_Classic.KeyExchange_ECDHE:X25519_MLKEM768 id=Client_Browser.KeyExchange_ECDHE:X25519_MLKEM768
   cryme deploy step=2
+  cryme verify step=2
   cryme verify tls step=2
 
 Note: 'show system' is deprecated — use 'show node'.
@@ -535,8 +537,9 @@ if (command === 'show' && args[1] === 'system') {
   runInit().then(() => process.exit(0));
 } else if (command === 'deploy') {
   runDeploy(args.slice(1));
-} else if (command === 'verify' && args[1] === 'tls') {
-  runVerifyTls(args.slice(2));
+} else if (command === 'verify' && (args[1] === 'tls' || !args[1] || args[1].startsWith('step=') || args[1] === 'baseline')) {
+  const verifyArgs = (args[1] === 'tls') ? args.slice(2) : args.slice(1).filter(a => a !== 'tls');
+  runVerifyTls(verifyArgs);
 } else if (command === 'verify' && args[1] === 'service') {
   runVerifyService(args.slice(2));
 } else if (command === 'migrate') {
