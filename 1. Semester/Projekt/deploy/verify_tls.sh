@@ -56,9 +56,8 @@ verify_curl_client() {
   echo "--- curl from Client_Browser container (cryme-curl-client) ---"
   local tlsflags=""
   if [[ -f "${SCRIPT_DIR}/client/expect.env" ]]; then
-    # shellcheck disable=SC1091
-    source "${SCRIPT_DIR}/client/expect.env"
-    tlsflags="${CRYME_CURL_TLSFLAGS:-}"
+    # Do not `source` expect.env — unquoted multi-word values break bash (e.g. --tls-max).
+    tlsflags="$(grep -E '^CRYME_CURL_TLSFLAGS=' "${SCRIPT_DIR}/client/expect.env" | tail -1 | cut -d= -f2- | sed 's/^"//;s/"$//')"
   fi
   # shellcheck disable=SC2086
   docker exec "${CURL_CONTAINER}" sh -c \

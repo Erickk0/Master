@@ -518,6 +518,9 @@ GUIDE.md                        Main entry-point guide
 
 | Document | When to use |
 |----------|-------------|
+| [docs/TECHNISCHE_DOKUMENTATION.md](docs/TECHNISCHE_DOKUMENTATION.md) | **Code architecture** — modules, data flow, deploy |
+| [docs/MEMGRAPH_ANLEITUNG.md](docs/MEMGRAPH_ANLEITUNG.md) | **Memgraph** — connect, queries, demo steps |
+| [docs/KI_NUTZUNG.md](docs/KI_NUTZUNG.md) | **AI usage** — transparency for reviewers |
 | [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) | One-page printout for live demo |
 | [docs/DOMAIN_ANALYSIS.md](docs/DOMAIN_ANALYSIS.md) | Deep dive: actors, use cases |
 | [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) | Deep dive: ER diagram, naming |

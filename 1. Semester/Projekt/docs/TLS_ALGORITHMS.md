@@ -50,7 +50,7 @@ curl -skv --tlsv1.3 --tls-max 1.3 https://127.0.0.1:8443/health
 curl -skv --tlsv1.2 --tls-max 1.2 https://127.0.0.1:8443/health
 
 # Aus dem Client-Container (simuliert Browser)
-docker exec cryme-curl-client sh -c 'source /client/expect.env && curl -skv $CRYME_CURL_TLSFLAGS https://nginx-classic/health'
+docker exec cryme-curl-client sh -c '. /client/expect.env && curl -skv $CRYME_CURL_TLSFLAGS https://nginx-classic/health'
 ```
 
 ### openssl-Prüfung
