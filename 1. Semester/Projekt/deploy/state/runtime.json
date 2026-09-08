@@ -1,0 +1,7 @@
+{
+  "migration_step": 4,
+  "profile": "tls13-only",
+  "service": "cryme-api",
+  "algorithms": {"Client_Browser.KeyExchange_ECDHE": "X25519_MLKEM768", "Webserver_Classic.Cert_RSA2048": "ML-DSA-44", "Webserver_Classic.KeyExchange_ECDHE": "X25519_MLKEM768", "Webserver_Classic.TLS_1.2_/_1.3_Communication": "TLS1.3"},
+  "deployed_at": "2026-07-16T22:09:29+02:00"
+}

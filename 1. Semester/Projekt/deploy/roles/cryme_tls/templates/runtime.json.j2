@@ -1,0 +1,7 @@
+{
+  "migration_step": {{ migration_step }},
+  "profile": "{{ cryme_tls_profile }}",
+  "service": "cryme-api",
+  "algorithms": {{ target_algorithms | to_json }},
+  "deployed_at": "{{ lookup('pipe', 'date -Iseconds') }}"
+}

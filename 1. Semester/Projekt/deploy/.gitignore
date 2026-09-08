@@ -1,0 +1,3 @@
+# Generated at deploy time — do not commit private keys or step vars
+nginx/certs/*.key
+vars/step_*.json

@@ -1,0 +1,31 @@
+# CRYME live TLS + API state — managed by cryme_tls role (step {{ migration_step }})
+
+server {
+    listen 443 ssl;
+    server_name localhost;
+
+    ssl_certificate     {{ ssl_certificate }};
+    ssl_certificate_key {{ ssl_certificate_key }};
+
+    ssl_protocols {{ ssl_protocols }};
+    ssl_ciphers {{ ssl_ciphers }};
+    ssl_prefer_server_ciphers on;
+
+    add_header X-Cryme-Tls-Profile "{{ cryme_tls_profile }}" always;
+    add_header X-Cryme-Migration-Step "{{ migration_step }}" always;
+
+    location /health {
+        return 200 "CRYME live TLS OK ({{ cryme_tls_profile }})\n";
+        add_header Content-Type text/plain;
+    }
+
+    location = /api/status {
+        default_type application/json;
+        alias /state/runtime.json;
+    }
+
+    location = /api/data {
+        default_type application/json;
+        alias /state/data.json;
+    }
+}

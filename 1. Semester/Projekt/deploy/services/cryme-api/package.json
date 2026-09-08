@@ -1,0 +1,12 @@
+{
+  "name": "cryme-api",
+  "version": "1.0.0",
+  "description": "CRYME live migratable HTTPS backend service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
