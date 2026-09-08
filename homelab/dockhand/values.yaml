@@ -1,0 +1,74 @@
+# Dockhand + bountino homelab configuration
+# Source of truth for docker-compose.yml and .env (copy non-secret values into .env)
+
+global:
+  timezone: Europe/Berlin
+
+dockhand:
+  image: fnsys/dockhand:latest
+  containerName: dockhand
+  restart: unless-stopped
+
+  # Web UI
+  hostPort: 3000
+  containerPort: 3000
+
+  # Persistence (bind mount; change to a path on your homelab host)
+  dataDir: ./data
+  # Set explicitly if Dockhand cannot resolve relative compose volume paths
+  hostDataDir: ""
+
+  user:
+    puid: 1000
+    pgid: 1000
+
+  security:
+    # Generate once: openssl rand -base64 32
+    # Store in .env as ENCRYPTION_KEY — back this up or encrypted credentials are lost
+    encryptionKey: ""
+    cookieSecure: false
+
+  # Optional: use PostgreSQL instead of SQLite
+  postgres:
+    enabled: false
+    image: postgres:16-alpine
+    user: dockhand
+    password: changeme
+    database: dockhand
+    volume: postgres_data
+
+  healthcheck:
+    enabled: true
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    startPeriod: 40s
+
+  # Uncomment if Dockhand sits behind Traefik / NPM / Caddy
+  reverseProxy:
+    enabled: false
+    network: proxy
+    hostname: dockhand.homelab.local
+
+git:
+  credential:
+    name: github-bountino
+    authType: password
+    username: x-access-token
+    # Set in .env as GITHUB_TOKEN (classic PAT with repo scope, or fine-grained read on bountino)
+
+  repository:
+    name: bountino
+    url: https://github.com/justinjd00/bountino.git
+    branch: main
+
+  stack:
+    name: bountino
+    environment: default
+    composePath: docker-compose.yml
+    envFilePath: .env
+    autoUpdate: true
+    autoUpdateCron: "0 3 * * *"
+    webhookEnabled: false
+    forceRedeployment: false
+    repullImages: true

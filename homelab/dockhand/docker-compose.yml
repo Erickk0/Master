@@ -1,0 +1,51 @@
+# Dockhand for bountino — driven by values.yaml + .env
+# Usage:
+#   cp .env.example .env
+#   docker compose up -d
+# Then in Dockhand UI: Settings → Git → add credential + repository (see values.yaml)
+
+services:
+  postgres:
+    profiles: ["postgres"]
+    image: postgres:16-alpine
+    container_name: dockhand-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dockhand}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-dockhand}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dockhand} -d ${POSTGRES_DB:-dockhand}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dockhand:
+    image: ${DOCKHAND_IMAGE:-fnsys/dockhand:latest}
+    container_name: ${DOCKHAND_CONTAINER_NAME:-dockhand}
+    restart: unless-stopped
+    ports:
+      - "${DOCKHAND_HOST_PORT:-3000}:${DOCKHAND_CONTAINER_PORT:-3000}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${DOCKHAND_DATA_DIR:-./data}:/app/data
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Europe/Berlin}
+      DATA_DIR: /app/data
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env — run: openssl rand -base64 32}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      HOST_DATA_DIR: ${HOST_DATA_DIR:-}
+      GIT_REPOS_DIR: /app/data/git-repos
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  postgres_data:
