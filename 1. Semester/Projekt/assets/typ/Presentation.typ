@@ -1,4 +1,4 @@
-// CRYME — Masterprojekt-Präsentation (15–20 Min.)
+// CRYME — Masterprojekt-Präsentation (~20 Min.)
 // typst compile "typ/Presentation.typ"
 
 #set page(width: 13.333in, height: 7.5in, margin: 0.45in)
@@ -120,6 +120,47 @@
 ])
 
 #pagebreak()
+#slide("Post-Quanten-Standards (NIST)", [
+  #two_col(
+    [
+      #keybox("Standardisierte Algorithmen", [
+        - *ML-KEM* (FIPS 203) — Key Encapsulation, ersetzt ECDHE/DH
+        - *ML-DSA* (FIPS 204) — digitale Signaturen, ersetzt RSA/ECDSA
+        - NIST-Standardisierung 2024 — Migration wird verpflichtend
+      ])
+      #v(0.16in)
+      #keybox("Hybrid-Übergang", [
+        - Nicht Big-Bang, sondern schrittweise Umstellung
+        - *X25519\_MLKEM768* — klassischer + PQC-KEX parallel
+        - Server und Client müssen denselben Modus sprechen
+      ])
+    ],
+    [
+      #keybox("CRYME-Migrationspfad (PoC)", [
+        #table(
+          columns: (auto, 1fr, auto),
+          inset: 4pt,
+          stroke: none,
+          table.header(
+            text(size: 11pt, weight: "bold")[Phase],
+            text(size: 11pt, weight: "bold")[Asset],
+            text(size: 11pt, weight: "bold")[Ziel],
+          ),
+          [1], [Key Exchange], [X25519\_MLKEM768],
+          [2], [Zertifikat], [ML-DSA-44],
+          [3], [TLS-Policy], [1.3 only],
+        )
+      ])
+      #v(0.16in)
+      #keybox("Warum relevant?", [
+        Jeder Schritt ändert das Verhalten des Live-Systems — \
+        falsche Reihenfolge oder isolierte Migration → Ausfall
+      ])
+    ],
+  )
+])
+
+#pagebreak()
 #slide("Was ist CRYME?", [
   #two_col(
     [
@@ -183,6 +224,75 @@
         + SCC-Expansion — Cluster gemeinsam migrieren \
         + Temporal Barriers — Vorbedingungen prüfen \
         + Deny-by-default — unsichere Schritte → FAILED
+      ])
+    ],
+  )
+])
+
+#pagebreak()
+#slide("Tech-Stack & Implementierung", [
+  #two_col(
+    [
+      #keybox("Anwendungsschicht", [
+        - *Node.js* — `cryme` CLI + Oracle-Engine
+        - *oracle.js* — SCC (Tarjan), Migration, Event Replay
+        - *twin\_loader.js* — YAML → Memgraph
+        - *neo4j-driver* — Bolt-Protokoll (:7687)
+        - *js-yaml* — Digital-Twin-Parsing
+      ])
+      #v(0.14in)
+      #keybox("Konfiguration & IaC", [
+        - *YAML* — Digital Twins (`webserver_pqc_twin.yaml`)
+        - *Ansible* + Jinja2 — Rolle `cryme_tls`
+        - Generierte Playbooks in `playbooks/`
+      ])
+    ],
+    [
+      #keybox("Infrastruktur (Docker)", [
+        - *Memgraph* — Graph-DB + Migrationshistorie
+        - *Memgraph Lab* — Graph-Visualisierung (:3000)
+        - *nginx 1.27* — TLS-Termination (:8443)
+        - *curl-client* — Browser-Simulation
+        - *docker-compose* — gesamter Live-Stack
+      ])
+      #v(0.14in)
+      #keybox("Verifikation", [
+        - *OpenSSL* — TLS-Handshake-Analyse
+        - *curl* — `/api/status` + Cipher-Suite-Check
+        - *verify\_tls.sh* — unabhängig von cryme API
+        - Zwei Sichten: Graph-Zustand ↔ Wire-Verhalten
+      ])
+    ],
+  )
+])
+
+#pagebreak()
+#slide("Oracle-Logik im Detail", [
+  #two_col(
+    [
+      #keybox("Drei Kantentypen", [
+        - *Explizit* — modelliert in YAML (depends\_on)
+        - *Implizit* — z. B. SecurityControl → CryptoAsset
+        - *Discovered* — beim FAIL neu gelernt (Server ↔ Client)
+      ])
+      #v(0.16in)
+      #keybox("SCC-Clustering (Tarjan)", [
+        - Starke Zusammenhangskomponenten im Graphen
+        - Knoten in einer SCC → *Co-Migration* Pflicht
+        - Ein Befehl, ein Cluster — Oracle erweitert automatisch
+      ])
+    ],
+    [
+      #keybox("Temporal Barriers", [
+        - `not_before`-Constraints zwischen Komponenten
+        - Beispiel: TLS 1.3 only erst nach abgeschlossenem KEX
+        - Verhindert unsichere Zwischenzustände → ABORTED
+      ])
+      #v(0.16in)
+      #keybox("Policy-Modell", [
+        - *Deny-by-default* — unsicherer Schritt → FAILED
+        - Simulation *vor* Deploy — kein Schaden am Live-System
+        - Event Sourcing — jeder Versuch im Migrationsbaum
       ])
     ],
   )
@@ -353,7 +463,7 @@
         - Ein Szenario (Webserver + Browser)
         - ML-DSA-Zertifikate experimentell
         - Keine vollautomatische Migrationsplanung
-        - Stack: Docker + Memgraph + Ansible
+        - Operator gibt Migrationsschritte vor
       ])
       #v(0.16in)
       #keybox("Vision", [
@@ -385,38 +495,5 @@
     #v(0.4in)
     #text(size: 22pt, weight: "bold", fill: dark)[Fragen?]
     #v(0.35in)
-    #text(size: 15pt, fill: muted)[
-      Live-Demo: cryme init → cryme migrate → cryme deploy \
-      ~/cryme · https://127.0.0.1:8443
-    ]
   ]
 ])
-
-// ── Sprechernotizen ──────────────────────────────────────────
-
-#pagebreak()
-#set page(paper: "a4", margin: 2cm)
-#set text(size: 11pt)
-
-#align(center)[
-  #text(size: 16pt, weight: "bold", fill: accent)[CRYME — Sprechernotizen (~17 Min. + Q&A)]
-]
-
-#v(1em)
-#table(
-  columns: (auto, auto, 1fr),
-  inset: 8pt,
-  stroke: 0.5pt + rgb("#D7E3F0"),
-  [*Folie*], [*Min.*], [*Inhalt*],
-  [Titel], [0:30], [CRYME vorstellen, Betreuung nennen],
-  [Motivation], [2:00], [PQC-Problem, Forschungsfrage, Client Problem andeuten],
-  [Was ist CRYME?], [1:30], [Orchestrator, Pipeline, drei Mechanismen],
-  [Architektur], [1:30], [Komponenten, Digital Twins, Oracle-Regeln],
-  [Demo Setup], [1:00], [ilmare, Baseline, zwei Sichten],
-  [Demo FAIL], [1:30], [Kernmoment — Client Problem!],
-  [Demo SUCCESS], [1:30], [Co-Migration, Deploy, Verifikation],
-  [Migrationsbaum], [1:00], [Terminal, Schritte 3–4, Event Sourcing],
-  [Ergebnisse], [1:00], [Vier Claims, TLS-Profile kurz],
-  [Fazit], [1:30], [Grenzen ehrlich, Kernbotschaft],
-  [Q&A], [3–5], [Live-Demo anbieten],
-)
