@@ -72,8 +72,8 @@ Es wurden **keine** KI-Modelle trainiert und **keine** Projektdaten an Dritte zu
 Folgende Dokumente wurden **inhaltlich vom Autor vorgegeben** und mit KI-Unterstützung ausformuliert:
 
 - `GUIDE.md`, `INSTALL.md`, `README.md`
-- `docs/TECHNISCHE_DOKUMENTATION.md`
-- `docs/MEMGRAPH_ANLEITUNG.md`
+- `docs/TECHNISCHE_DOKUMENTATION.md` / `docs/TECHNICAL_DOCUMENTATION.md`
+- `docs/MEMGRAPH_ANLEITUNG.md` / `docs/MEMGRAPH_GUIDE.md`
 - `docs/KI_NUTZUNG.md` (dieses Dokument)
 - `docs/CLI_GUIDE.md`, `docs/LIVE_DEMO_CHEAT_SHEET.md`
 
@@ -148,8 +148,8 @@ Auf Anfrage kann der Autor für kritische Module (insb. `oracle.js`) eine grobe 
 Zum Verständnis des Projekts empfehlen sich diese Dokumente in dieser Reihenfolge:
 
 1. [GUIDE.md](../GUIDE.md) — Gesamtüberblick
-2. [TECHNISCHE_DOKUMENTATION.md](TECHNISCHE_DOKUMENTATION.md) — Code-Architektur
-3. [MEMGRAPH_ANLEITUNG.md](MEMGRAPH_ANLEITUNG.md) — Graph-Datenbank + Beispielqueries
+2. [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) — Code-Architektur (EN)
+3. [MEMGRAPH_GUIDE.md](MEMGRAPH_GUIDE.md) — Graph-Datenbank + Beispielqueries (EN)
 4. [LIVE_DEMO_CHEAT_SHEET.md](LIVE_DEMO_CHEAT_SHEET.md) — 5-Minuten-Demo
 
 ---

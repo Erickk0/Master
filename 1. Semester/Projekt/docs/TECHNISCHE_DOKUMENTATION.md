@@ -1,5 +1,7 @@
 # CRYME — Technische Dokumentation
 
+> **English version:** [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md)
+
 Diese Dokumentation erklärt den **Quellcode**, die **Architektur** und den **Datenfluss** von CRYME. Zielgruppe: Gutachter, die den Code nachvollziehen möchten, ohne jede Datei einzeln lesen zu müssen.
 
 > Kurzüberblick für Anwender: [GUIDE.md](../GUIDE.md) · Installation: [INSTALL.md](../INSTALL.md)
@@ -341,7 +343,8 @@ cryme verify step=2
 
 | Dokument | Inhalt |
 |----------|--------|
-| [MEMGRAPH_ANLEITUNG.md](MEMGRAPH_ANLEITUNG.md) | Memgraph bedienen, Beispielqueries |
+| [MEMGRAPH_GUIDE.md](MEMGRAPH_GUIDE.md) | Memgraph usage + example queries (EN) |
+| [MEMGRAPH_ANLEITUNG.md](MEMGRAPH_ANLEITUNG.md) | Memgraph bedienen, Beispielqueries (DE) |
 | [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) | Event Sourcing, HEAD, Replay |
 | [migration_explanation.md](migration_explanation.md) | Oracle SCC-Verhalten im Detail |
 | [DOMAIN_MODEL.md](DOMAIN_MODEL.md) | ER-Diagramm, Namensregeln |

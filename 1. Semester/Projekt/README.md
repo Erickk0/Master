@@ -34,8 +34,10 @@ Print [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) and run on 
 |-----|---------|
 | [**INSTALL.md**](INSTALL.md) | **Local install** — clone from git, Mac/Linux |
 | [**GUIDE.md**](GUIDE.md) | **Main guide** — everything in one place |
-| [docs/TECHNISCHE_DOKUMENTATION.md](docs/TECHNISCHE_DOKUMENTATION.md) | **Code architecture** (for reviewers) |
-| [docs/MEMGRAPH_ANLEITUNG.md](docs/MEMGRAPH_ANLEITUNG.md) | **Memgraph guide** + example queries |
+| [docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) | **Code architecture** (for reviewers) |
+| [docs/TECHNISCHE_DOKUMENTATION.pdf](docs/TECHNISCHE_DOKUMENTATION.pdf) | **Technische Dokumentation** (PDF, Deutsch) |
+| [docs/MEMGRAPH_GUIDE.md](docs/MEMGRAPH_GUIDE.md) | **Memgraph guide** + example queries |
+| [docs/MEMGRAPH_ANLEITUNG.pdf](docs/MEMGRAPH_ANLEITUNG.pdf) | **Memgraph-Anleitung** (PDF, Deutsch) |
 | [docs/KI_NUTZUNG.md](docs/KI_NUTZUNG.md) | **AI usage** documentation |
 | [docs/LIVE_DEMO_CHEAT_SHEET.md](docs/LIVE_DEMO_CHEAT_SHEET.md) | One-page demo script |
 | [docs/DOMAIN_ANALYSIS.md](docs/DOMAIN_ANALYSIS.md) | Actors, views, use cases |

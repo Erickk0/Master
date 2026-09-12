@@ -1,5 +1,7 @@
 # CRYME — Memgraph-Anleitung
 
+> **English version:** [MEMGRAPH_GUIDE.md](MEMGRAPH_GUIDE.md)
+
 Diese Anleitung erklärt, wie **Memgraph** in CRYME genutzt wird: Verbindung, Graph-Struktur, Cypher-Queries und Zusammenhang mit den **Demo-Migrationsschritten 0–4**.
 
 > Technischer Code-Überblick: [TECHNISCHE_DOKUMENTATION.md](TECHNISCHE_DOKUMENTATION.md)  
@@ -537,5 +539,6 @@ Dann lädt `twin_loader.js` den Zwilling neu aus YAML. **Alle Migrationshistorie
 | [GRAPH_VERSIONING.md](GRAPH_VERSIONING.md) | Event Sourcing, HEAD, Replay-Algorithmus |
 | [MIGRATION_STATES.md](MIGRATION_STATES.md) | Zustandsdiagramme pro Schritt |
 | [migration_explanation.md](migration_explanation.md) | Oracle SCC-Verhalten |
-| [TECHNISCHE_DOKUMENTATION.md](TECHNISCHE_DOKUMENTATION.md) | Code-Architektur |
+| [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) | Code architecture (EN) |
+| [TECHNISCHE_DOKUMENTATION.md](TECHNISCHE_DOKUMENTATION.md) | Code-Architektur (DE) |
 | [LIVE_DEMO_CHEAT_SHEET.md](LIVE_DEMO_CHEAT_SHEET.md) | 5-Minuten-Demo zum Ausdrucken |
