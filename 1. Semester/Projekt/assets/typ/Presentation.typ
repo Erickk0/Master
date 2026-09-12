@@ -34,6 +34,7 @@
 )
 
 #let keybox(title, content) = block(
+  width: 100%,
   fill: soft,
   stroke: 0.8pt + rgb("#D7E3F0"),
   radius: 10pt,
@@ -89,33 +90,25 @@
 
 #pagebreak()
 #slide("Motivation und Forschungsfrage", [
-  #two_col(
-    [
-      #keybox("Warum PQC-Migration?", [
-        - Quantencomputer bedrohen RSA und ECC (Shor-Algorithmus).
-        - NIST hat Post-Quanten-Kryptografie standardisiert (ML-KEM, ML-DSA).
-        - Migration ist kein Algorithmus-Tausch, sondern ein Systemproblem.
-      ])
-      #v(0.18in)
-      #keybox("Zentrale Forschungsfrage", [
-        #quote[*Können versteckte kryptografische Abhängigkeiten automatisch erkannt und in eine sichere Migrationsreihenfolge überführt werden?*]
-      ])
-    ],
-    [
-      #keybox("Das Problem", [
-        - Server ↔ Client (Key Exchange)
-        - Zertifikat ↔ Schlüssel (Trust Chain)
-        - TLS-Version ↔ KEX-Algorithmus
-        #v(0.1in)
-        Naive Einzel-Migration eines Assets kann das gesamte System ausfallen lassen.
-      ])
-      #v(0.18in)
-      #align(center)[
-        #text(size: 13pt, fill: muted)[
-          Klassisch (RSA, ECDHE) → Post-Quanten (ML-KEM, ML-DSA)
-        ]
-      ]
-    ],
+  #grid(
+    columns: (1fr, 1fr),
+    column-gutter: 0.45in,
+    row-gutter: 0.18in,
+    keybox("Warum PQC-Migration?", [
+      - Quantencomputer bedrohen RSA und ECC (Shor-Algorithmus).
+      - NIST hat Post-Quanten-Kryptografie standardisiert (ML-KEM, ML-DSA).
+      - Migration ist kein Algorithmus-Tausch, sondern ein Systemproblem.
+    ]),
+    keybox("Das Problem", [
+      - Server ↔ Client (Key Exchange)
+      - Zertifikat ↔ Schlüssel (Trust Chain)
+      - TLS-Version ↔ KEX-Algorithmus
+      #v(0.1in)
+      Naive Einzel-Migration eines Assets kann das gesamte System ausfallen lassen.
+    ]),
+    keybox("Zentrale Forschungsfrage", [
+      #quote[*Können kryptografische Abhängigkeiten automatisch erkannt und in eine sichere Migrationsreihenfolge überführt werden?*]
+    ]),
   )
 ])
 
@@ -267,38 +260,6 @@
 ])
 
 #pagebreak()
-#slide("Oracle-Logik im Detail", [
-  #two_col(
-    [
-      #keybox("Drei Kantentypen", [
-        - *Explizit* — modelliert in YAML (depends\_on)
-        - *Implizit* — z. B. SecurityControl → CryptoAsset
-        - *Discovered* — beim FAIL neu gelernt (Server ↔ Client)
-      ])
-      #v(0.16in)
-      #keybox("SCC-Clustering (Tarjan)", [
-        - Starke Zusammenhangskomponenten im Graphen
-        - Knoten in einer SCC → *Co-Migration* Pflicht
-        - Ein Befehl, ein Cluster — Oracle erweitert automatisch
-      ])
-    ],
-    [
-      #keybox("Temporal Barriers", [
-        - `not_before`-Constraints zwischen Komponenten
-        - Beispiel: TLS 1.3 only erst nach abgeschlossenem KEX
-        - Verhindert unsichere Zwischenzustände → ABORTED
-      ])
-      #v(0.16in)
-      #keybox("Policy-Modell", [
-        - *Deny-by-default* — unsicherer Schritt → FAILED
-        - Simulation *vor* Deploy — kein Schaden am Live-System
-        - Event Sourcing — jeder Versuch im Migrationsbaum
-      ])
-    ],
-  )
-])
-
-#pagebreak()
 #slide("Demo-Setup", [
   #two_col(
     [
@@ -406,9 +367,10 @@
       ]
     ],
     [
-      #keybox("Schritte 3–4", [
-        - *Schritt 3:* Zertifikat RSA → ML-DSA-44
-        - *Schritt 4:* TLS 1.2/1.3 → TLS 1.3 only
+      #keybox("Schritte 3–5", [
+        - *Schritt 3:* Zertifikat Migration zu früh - temporal barrier
+        - *Schritt 4:* Zertifikat RSA → ML-DSA-44
+        - *Schritt 5:* TLS 1.2/1.3 → TLS 1.3 only
         - Jeweils: migrate → deploy → verify
       ])
       #v(0.16in)
@@ -479,12 +441,6 @@
         #quote[Versteckte Abhängigkeiten → Clusters → sichere Reihenfolge]
       ])
       #v(0.16in)
-      #keybox("Beitrag", [
-        1. Oracle-Framework für kryptografische Migration \
-        2. Graphbasiertes SCC-Clustering \
-        3. End-to-End: YAML → Deploy → Verify \
-        4. Event Sourcing & Audit-Trail
-      ])
     ],
   )
 ])
