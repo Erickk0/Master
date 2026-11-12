@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Assignment 1b</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    max-width: 860px;
+    margin: 36px auto;
+    color: #1c1c1c;
+    padding: 0 16px 48px;
+  }
+  h1 { font-size: 22px; font-weight: normal; margin-bottom: 4px; }
+  h2 { font-size: 18px; margin-top: 34px; }
+  p, li { line-height: 1.4; }
+  .src { color: #555; font-size: 14px; }
+  pre {
+    font-family: "Courier New", monospace;
+    font-size: 14px;
+    background: #f3f3f3;
+    padding: 12px 14px;
+    line-height: 1.55;
+  }
+  svg { font-family: Helvetica, Arial, sans-serif; }
+</style>
+</head>
+<body>
+
+<h1>Assignment 1b – Datasets</h1>
+<p>Erick Zeiler</p>
+
+<h2>1. 3D structured grid</h2>
+<p>nx, ny, nz are the number of grid points along each axis, not the number of cells.</p>
+<pre>points = nx * ny * nz
+
+lines  = ny*nz*(nx-1) + nx*nz*(ny-1) + nx*ny*(nz-1)
+
+faces  = nx*(ny-1)*(nz-1) + ny*(nx-1)*(nz-1) + nz*(nx-1)*(ny-1)
+
+voxels = (nx-1) * (ny-1) * (nz-1)</pre>
+<p>Check with one cube, so nx = ny = nz = 2: 8 points, 12 lines, 6 faces, 1 voxel.</p>
+
+<h2>2a. Scatter plot</h2>
+<p>Greenhouse gas emissions per person (2022) against GDP per capita (2023, PPP). One point is one country. Hover a point for the name.</p>
+<p class="src">OECD air emission inventories (kg CO2-equivalent per person, unit multiplier thousands, shown here as tonnes) and OECD GDP per capita, current prices, current PPPs. Aggregates like OECD and EU were left out. 50 countries sit in both files.</p>
+<div id="scatter"></div>
+
+<h2>2b. Bar chart</h2>
+<p>The 12 countries from that same set with the highest emissions per person.</p>
+<div id="bars"></div>
+
+<script>
+const data = [{"country":"Argentina","ghg":7.7,"gdp":29498},{"country":"Australia","ghg":20.03,"gdp":75253},{"country":"Austria","ghg":8.11,"gdp":74591},{"country":"Belgium","ghg":8.82,"gdp":72783},{"country":"Bulgaria","ghg":8.59,"gdp":38990},{"country":"Canada","ghg":17.92,"gdp":64962},{"country":"Chile","ghg":5.68,"gdp":32672},{"country":"Croatia","ghg":6.26,"gdp":48084},{"country":"Cyprus","ghg":6.57,"gdp":59758},{"country":"Czechia","ghg":10.69,"gdp":55990},{"country":"Denmark","ghg":7.45,"gdp":77229},{"country":"Estonia","ghg":10.49,"gdp":48756},{"country":"Finland","ghg":8.21,"gdp":63478},{"country":"France","ghg":6.22,"gdp":60923},{"country":"Georgia","ghg":5.3,"gdp":25072},{"country":"Germany","ghg":8.91,"gdp":72873},{"country":"Greece","ghg":7.45,"gdp":42772},{"country":"Hungary","ghg":6.16,"gdp":46447},{"country":"Iceland","ghg":12.56,"gdp":83480},{"country":"India","ghg":2.38,"gdp":10642},{"country":"Indonesia","ghg":3.84,"gdp":15554},{"country":"Ireland","ghg":11.53,"gdp":132831},{"country":"Israel","ghg":8.96,"gdp":54795},{"country":"Italy","ghg":6.79,"gdp":60322},{"country":"Japan","ghg":8.87,"gdp":52796},{"country":"Kazakhstan","ghg":17.77,"gdp":39347},{"country":"Korea","ghg":13.94,"gdp":57403},{"country":"Latvia","ghg":5.33,"gdp":42614},{"country":"Lithuania","ghg":6.52,"gdp":53587},{"country":"Luxembourg","ghg":12.66,"gdp":152293},{"country":"Malta","ghg":4.27,"gdp":66871},{"country":"Mexico","ghg":5.92,"gdp":25271},{"country":"Morocco","ghg":2.66,"gdp":10234},{"country":"Netherlands","ghg":8.52,"gdp":80392},{"country":"New Zealand","ghg":15.13,"gdp":54618},{"country":"Norway","ghg":8.91,"gdp":107760},{"country":"Poland","ghg":9.87,"gdp":47258},{"country":"Portugal","ghg":5.38,"gdp":49800},{"country":"Romania","ghg":5.23,"gdp":45802},{"country":"Serbia","ghg":9.23,"gdp":29719},{"country":"Singapore","ghg":10.36,"gdp":143778},{"country":"Slovak Republic","ghg":6.78,"gdp":45828},{"country":"Slovenia","ghg":7.4,"gdp":56209},{"country":"South Africa","ghg":7.63,"gdp":15952},{"country":"Spain","ghg":6.11,"gdp":55606},{"country":"Sweden","ghg":4.31,"gdp":68052},{"country":"Switzerland","ghg":4.74,"gdp":93661},{"country":"Türkiye","ghg":6.45,"gdp":41572},{"country":"United Kingdom","ghg":5.96,"gdp":61047},{"country":"United States","ghg":18.57,"gdp":82505}];
+
+const sw = 820;
+const sh = 460;
+const sm = {top: 16, right: 16, bottom: 48, left: 58};
+
+const scatter = d3.select("#scatter").append("svg").attr("width", sw).attr("height", sh);
+
+const x = d3.scaleLinear()
+  .domain([0, d3.max(data, d => d.gdp) * 1.04])
+  .range([sm.left, sw - sm.right]);
+
+const y = d3.scaleLinear()
+  .domain([0, d3.max(data, d => d.ghg) * 1.08])
+  .range([sh - sm.bottom, sm.top]);
+
+scatter.append("g")
+  .attr("transform", "translate(0," + (sh - sm.bottom) + ")")
+  .call(d3.axisBottom(x).ticks(6).tickFormat(d3.format(",")))
+  .selectAll("text")
+  .style("font-size", "12px");
+
+scatter.append("g")
+  .attr("transform", "translate(" + sm.left + ",0)")
+  .call(d3.axisLeft(y))
+  .selectAll("text")
+  .style("font-size", "12px");
+
+scatter.append("text")
+  .attr("x", (sm.left + sw - sm.right) / 2)
+  .attr("y", sh - 8)
+  .attr("text-anchor", "middle")
+  .attr("font-size", "13px")
+  .text("GDP per capita, USD PPP (2023)");
+
+scatter.append("text")
+  .attr("transform", "rotate(-90)")
+  .attr("x", -(sm.top + sh - sm.bottom) / 2)
+  .attr("y", 16)
+  .attr("text-anchor", "middle")
+  .attr("font-size", "13px")
+  .text("t CO2e per person (2022)");
+
+scatter.selectAll("circle")
+  .data(data)
+  .join("circle")
+  .attr("cx", d => x(d.gdp))
+  .attr("cy", d => y(d.ghg))
+  .attr("r", 5)
+  .attr("fill", "#2a6f97")
+  .append("title")
+  .text(d => d.country + ": " + d.ghg + " t, GDP " + d.gdp);
+
+const top = data.slice().sort((a, b) => b.ghg - a.ghg).slice(0, 12);
+const bw = 820;
+const bh = 34 * top.length + 36;
+const bm = {top: 8, right: 24, bottom: 28, left: 120};
+
+const bars = d3.select("#bars").append("svg").attr("width", bw).attr("height", bh);
+
+const xb = d3.scaleLinear()
+  .domain([0, d3.max(top, d => d.ghg) * 1.08])
+  .range([bm.left, bw - bm.right]);
+
+const yb = d3.scaleBand()
+  .domain(top.map(d => d.country))
+  .range([bm.top, bh - bm.bottom])
+  .padding(0.22);
+
+bars.append("g")
+  .attr("transform", "translate(0," + (bh - bm.bottom) + ")")
+  .call(d3.axisBottom(xb))
+  .selectAll("text")
+  .style("font-size", "12px");
+
+bars.append("g")
+  .attr("transform", "translate(" + bm.left + ",0)")
+  .call(d3.axisLeft(yb))
+  .selectAll("text")
+  .style("font-size", "12px");
+
+bars.selectAll("rect")
+  .data(top)
+  .join("rect")
+  .attr("x", bm.left)
+  .attr("y", d => yb(d.country))
+  .attr("width", d => xb(d.ghg) - bm.left)
+  .attr("height", yb.bandwidth())
+  .attr("fill", "#bc4749")
+  .append("title")
+  .text(d => d.country + ": " + d.ghg + " t CO2e per person");
+</script>
+
+</body>
+</html>
