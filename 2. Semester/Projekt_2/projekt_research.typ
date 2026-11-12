@@ -23,6 +23,16 @@
 #show link: it => underline(text(fill: rgb("#2b6cb0"), it))
 #show raw.where(block: true): set text(font: "DejaVu Sans Mono", size: 8.5pt)
 
+#let sourced-figure(img, caption) = {
+  v(6pt)
+  align(center)[
+    #img
+    #v(3pt)
+    #text(size: 8pt, fill: luma(90))[#caption]
+  ]
+  v(4pt)
+}
+
 // Title Block
 #align(center)[
   #block(width: 100%, inset: 15pt)[
@@ -61,9 +71,9 @@
 
 == Scope-Definition aus Anwendungsfall "Automotive"
 
-In modernen Fahrzeugarchitekturen kommunizieren verteilte Steuergeräte (ECUs) über ein internes Fahrzeugnetzwerk (CAN/Ethernet). Das Fahrzeug selbst agiert als Edge-Knoten, der über gesicherte TLS-Kanäle mit einem zentralen Backend-Server (OEM-Cloud/Flottenmanagement) verbunden ist.
+In modernen Fahrzeugarchitekturen kommunizieren verteilte Steuergeräte (ECUs) über ein internes Fahrzeugnetzwerk (CAN/Ethernet). Das Fahrzeug selbst agiert als Edge-Knoten, der über gesicherte TLS-Kanäle mit einem zentralen Backend-Server (OEM-Cloud/Flottenmanagement) verbunden ist. Die kryptographische Identität eines Teilnehmers steckt dabei im Zertifikat: Eine offene TLS-Verbindung allein sagt nicht, welches Steuergerät oder welcher Server am anderen Ende steht.
 
-Das Backend wiederum tauscht Informationen und Zertifikatssignierungsanfragen (CSRs) über eine explizit abgesicherte TLS-Verbindung mit einer Certificate Authority (CA) aus. Parallel existiert eine Schnittstelle zur Fabrik / zum Werk, wo Erstzertifikate bei der Produktion im Steuergerät verankert werden.
+Das Backend wiederum tauscht Informationen und Zertifikatssignierungsanfragen (CSRs) über eine explizit abgesicherte TLS-Verbindung mit einer Certificate Authority (CA) aus. Parallel existiert eine Schnittstelle zur Fabrik / zum Werk, wo Erstzertifikate bei der Produktion im Steuergerät verankert werden. Danach muss dieselbe Vertrauenskette über Backend und CA weitergeführt werden können, auch wenn der Signaturalgorithmus von klassisch auf PQC wechselt.
 
 #align(center)[
   #rect(fill: rgb("#edf2f7"), inset: 10pt, radius: 4pt)[
@@ -74,6 +84,13 @@ Das Backend wiederum tauscht Informationen und Zertifikatssignierungsanfragen (C
     ]
   ]
 ]
+
+Die allgemeine Rollenverteilung einer PKI, auf der dieser Pfad aufsetzt, zeigt die folgende Abbildung. Die Zertifizierungsstelle stellt Zertifikate aus, die Registrierungsstelle prüft die Identität des Antragstellers, und der Validierungsdienst bestätigt später, ob ein Zertifikat noch gilt. Im Automotive-Fall liegt die Erstverankerung bei der Fabrik, der laufende Austausch beim Backend und die Signierung bei der CA.
+
+#sourced-figure(
+  image("assets/pki-de.png", width: 78%),
+  [Abbildung: Rollen einer Public-Key-Infrastruktur. Quelle: Bananenfalter, Wikimedia Commons, CC0, #link("https://commons.wikimedia.org/wiki/File:Orange_blue_public_key_infrastructure_1_de.svg")[Datei auf Wikimedia Commons].],
+)
 
 == Scope-Definition aus Iteration \#1 (Architektur & Software-Stacks)
 
@@ -102,21 +119,28 @@ Die IETF standardisiert Mechanismen, um klassische Schlüssel (RSA/ECC) schrittw
 
 *RFC 10073 (Composite Signatures for PKI):* Regelt die Kombination von klassischen Algorithmen (z.B. ECDSA) mit PQC-Algorithmen (z.B. ML-DSA) in einem einzigen Zertifikat. Ein Angreifer müsste beide Verfahren brechen, um die Signatur zu fälschen.
 
+Die Dokumente haben dabei unterschiedliche Zuständigkeiten. RFC 9810 spezifiziert CMP und ergänzt die Verwaltung von Zertifikaten mit KEM-Schlüsseln. EST selbst ist in RFC 7030 beschrieben. RFC 10073 verbindet eine klassische Signatur und ML-DSA zu einer Composite-Signatur innerhalb eines X.509-Zertifikats. Falcon ist im Text als weiteres Signaturverfahren genannt; ein zugehöriger FIPS ist noch nicht veröffentlicht.
+
 == ITU-T X.509 / ISO/IEC 9594-8 & NIST SP 800-227
 
 *ITU-T X.509 (v3 Extensions):* Nutzung von Alternative Public Key und Alternative Signature Algorithm Extensions (altSignature Value, altSignatureAlgorithm), um Hybridsignaturen standardkonform in bestehenden X.509-Strukturen einzubetten.
 
-*NIST SP 800-227:* Entwurf für Übergangsstrategien zur Post-Quanten-Kryptographie in Regierungs- und Industrie-Infrastrukturen mit Fokus auf Verfügbarkeit und Identitätskontinuität.
+*NIST SP 800-227:* Recommendations for Key-Encapsulation Mechanisms. Empfehlungen zur sicheren Verwendung von KEMs, auch für hybride Verfahren während der Migration.
 
 == IETF Catalyst Framework / Hybrid & Cross-Certification
 
-Das Catalyst Framework definiert ein duales Re-Keying-Verfahren. Eine CA bestätigt ihre Kontinuität durch eine Überkreuz-Signierung (Cross-Certification) zwischen dem alten Schlüssel $"sk"_"alt"$ und dem neuen PQC-Schlüssel $"pk"_"neu"$.
+Das Catalyst Framework definiert ein duales Re-Keying-Verfahren. Eine CA bestätigt ihre Kontinuität durch eine Überkreuz-Signierung (Cross-Certification) zwischen dem alten Schlüssel $"sk"_"alt"$ und dem neuen PQC-Schlüssel $"pk"_"neu"$. Technisch ist das derselbe Mechanismus wie in der folgenden Abbildung: Ein Zertifikat wird von einem anderen Schlüssel signiert, damit Teilnehmer der alten und der neuen Vertrauenskette denselben Inhaber erkennen. Im Projekt entspricht PKI 1 der klassischen CA und PKI 2 der PQC-CA.
+
+#sourced-figure(
+  image("assets/cross-certification.png", width: 92%),
+  [Abbildung: Cross-Certification zwischen zwei PKIs. Ein Pfeil bedeutet „signiert von“; gleiche Farbe bedeutet gleicher öffentlicher Schlüssel. Quelle: Hydrargyrum, Wikimedia Commons, gemeinfrei, #link("https://commons.wikimedia.org/wiki/File:Cross-certification_diagram.svg")[Datei auf Wikimedia Commons].],
+)
 
 #v(10pt)
 
 = Mathematische & Protokollarische Formalisierung des Migrations-Zertifikats
 
-Das auf dem Whiteboard definierte Migrations-Zertifikat dient als Beweis, dass der Inhaber des neuen PQC-Schlüsselpaars ($"pk"_"neu"$, $"sk"_"neu"$) identisch mit dem Inhaber des bisherigen klassischen Schlüsselpaars ($"pk"_"alt"$, $"sk"_"alt"$) ist.
+Das auf dem Whiteboard definierte Migrations-Zertifikat dient als Beweis, dass der Inhaber des neuen PQC-Schlüsselpaars ($"pk"_"neu"$, $"sk"_"neu"$) identisch mit dem Inhaber des bisherigen klassischen Schlüsselpaars ($"pk"_"alt"$, $"sk"_"alt"$) ist. Ohne diese Verkettung könnte auf dem unsicheren Kanal ein fremder Schlüssel als Nachfolger ausgegeben werden. Die Signatur mit $"sk"_"alt"$ bindet $"pk"_"neu"$ an die bereits bekannte Identität. Die Signatur mit $"sk"_"neu"$ zeigt, dass der neue Schlüssel zusätzlich selbst gültig signieren kann.
 
 == Mathematische Definition
 
@@ -189,7 +213,7 @@ project-root/
 
 == Geheimhaltung & Security Boundaries
 
-*Private Key Exclusion:* Das Git-Repository des CA-Servers darf unter keinen Umständen private Schlüssel ($"sk"_"alt"$, $"sk"_"neu"$) enthalten. In .gitignore ist zwingend einzutragen:
+*Private Key Exclusion:* Das Git-Repository des CA-Servers darf unter keinen Umständen private Schlüssel ($"sk"_"alt"$, $"sk"_"neu"$) enthalten. Öffentliche Zertifikate dürfen dort liegen, weil sie ohnehin verteilt werden. Ein Clone des Repositories darf dagegen keine Signaturmacht enthalten. In .gitignore ist zwingend einzutragen:
 
 ```
 *.key
@@ -273,6 +297,8 @@ Das Projekt folgt einem inkrementellen Vorgehen in 2 bis 3 Wochen Sprints.
 
 + Brockhaus, H., von Oheimb, D., Ounsworth, M. und Gray, J. (29. Juli 2025). *Internet X.509 Public Key Infrastructure -- Certificate Management Protocol (CMP).* RFC 9810. #link("https://www.rfc-editor.org/rfc/rfc9810.html")
 
++ Pritikin, M., Yee, P. und Harkins, D. (Oktober 2013). *Enrollment over Secure Transport (EST).* RFC 7030. #link("https://www.rfc-editor.org/info/rfc7030/")
+
 + Ounsworth, M., Gray, J., Pala, M., Klaußner, J. und Fluhrer, S. (November 2026). *Composite ML-DSA for Use in X.509 Public Key Infrastructure.* RFC 10073. #link("https://www.rfc-editor.org/info/rfc10073/")
 
 + ITU-T Recommendation X.509 \| ISO/IEC 9594-8. *Information technology -- Open Systems Interconnection -- The Directory: Public-key and attribute certificate frameworks.* Alternative Public Key und Alternative Signature Extensions. Das im Text genannte Catalyst Framework ist dieser X.509-Mechanismus.
@@ -285,9 +311,15 @@ Das Projekt folgt einem inkrementellen Vorgehen in 2 bis 3 Wochen Sprints.
 
 + National Institute of Standards and Technology (13. August 2024). *Stateless Hash-Based Digital Signature Standard (SLH-DSA, SPHINCS+).* FIPS 205. #link("https://doi.org/10.6028/NIST.FIPS.205")
 
++ Falcon (FN-DSA). Im Text genannt. Ein FIPS auf dieser Basis ist bei NIST in Arbeit und noch nicht veröffentlicht. #link("https://csrc.nist.gov/projects/post-quantum-cryptography")
+
 + Open Quantum Safe Project. *oqs-provider* für OpenSSL 3.3 und 3.4. #link("https://github.com/open-quantum-safe/oqs-provider")
 
 + OpenSSL Project. OpenSSL 3.3, OpenSSL 3.4 und OpenSSL 3.5. #link("https://www.openssl.org/")
+
++ Bananenfalter (2012). *Orange blue public key infrastructure 1 de.* Wikimedia Commons, CC0. #link("https://commons.wikimedia.org/wiki/File:Orange_blue_public_key_infrastructure_1_de.svg")
+
++ Hydrargyrum (2016). *Cross-certification diagram.* Wikimedia Commons, gemeinfrei. #link("https://commons.wikimedia.org/wiki/File:Cross-certification_diagram.svg")
 
 #v(15pt)
 
