@@ -247,9 +247,105 @@ Im Rahmen des Projekts und der Begleitdokumentation sollen folgende Forschungsfr
 
 #pagebreak()
 
+= Meeting 1 (13. November 2026): Vereinfachter Prototyp
+
+Das Meeting legt den ersten lauffähigen Prototyp fest. Er ist bewusst einfacher als die Cross-Certification der vorherigen Abschnitte. Dual-Signature und Composite-Zertifikate bleiben die Forschungsfragen RQ1 und RQ2. Der Prototyp zeigt zuerst nur den Wechsel des Vertrauensankers: Der Agent kennt das alte CA-Zertifikat, holt darüber das neue und spricht danach nur noch mit dem neuen.
+
+== Beteiligte und Zertifikate
+
+Es gibt zwei Rollen. Die CA ist zugleich der TLS-Server und besitzt beide Schlüsselpaare. Der Agent besitzt zu Beginn nur `cert_CA_old`. Es gibt keine Zertifikatskette, keine Client-Zertifikate und kein mTLS.
+
+Auf dem Whiteboard stand für das alte Zertifikat die Signatur über das Tupel inklusive privatem Schlüssel. Signiert wird der öffentliche Teil. Der private Schlüssel ist das Signierwerkzeug und gehört nicht in das signierte Tupel:
+
+$ "cert"_"CA-old" = "Sig"(("CA", "pk"_"CA-old"), "sk"_"CA-old") $
+
+Dieses Zertifikat ist nicht PQ-sicher. Signaturalgorithmus ist ECDSA auf der Kurve P-256 mit SHA-256. X.509 v3 bleibt der Zertifikatsstandard.
+
+$ "cert"_"CA" = "Sig"(("CA", "pk"_"CA"), "sk"_"CA") $
+
+Dieses Zertifikat ist PQ-sicher. Die Signaturfamilie ist ML-DSA (FIPS 204), im Prototyp die Stufe ML-DSA-65. Die Einbettung in X.509 folgt RFC 9881. X.509 bleibt auch hier der Zertifikatsstandard. Zwischen alt und neu ändern sich nur die Algorithmen, nicht das Format und nicht die TLS-Version.
+
+== Ablauf getCert
+
+Der Agent baut die erste TLS-Verbindung mit dem bereits bekannten `cert_CA_old` auf, lädt `cert_CA` und ersetzt danach seinen Vertrauensanker.
+
++ Der Agent öffnet TLS 1.3 zur CA und prüft den Server gegen `cert_CA_old`.
++ Der Agent sendet `getCert`. Die CA antwortet mit `cert_CA`.
++ Der Agent beendet die Verbindung.
++ Der Agent öffnet eine neue TLS-1.3-Verbindung und prüft den Server nur noch gegen `cert_CA`.
+
+```
+Agent                         CA
+  |  TLS mit cert_CA_old       |
+  | ----- getCert -----------> |
+  | <---- cert_CA ------------- |
+  |  Verbindung beenden        |
+  |  TLS mit cert_CA           |
+```
+
+Das Vertrauen in das neue Zertifikat stammt aus der alten, nicht PQ-sicheren Verbindung. Für den Prototyp ist das der vorgesehene Weg. Für die spätere Bewertung ist genau diese Stelle der Angriffspunkt, den das Migrations-Zertifikat aus RQ1 schließen soll.
+
+== Gewählte Bibliotheken und Algorithmen
+
+Die Frage des Meetings, welche TLS-Versionen und Bibliotheken nötig sind, ist für den Prototyp so beantwortet: eine Bibliothek, OpenSSL 3.5 LTS, und in beiden Phasen TLS 1.3. OpenSSL 3.5 enthält ML-KEM, ML-DSA und SLH-DSA nativ. Ein oqs-provider ist für diesen Prototyp nicht nötig. Python übernimmt nur die Verbindungen. Die Zertifikate werden einmalig mit `openssl req` erzeugt. Python muss gegen OpenSSL ab 3.5 gebaut sein. `SSLContext.set_groups()` und `set_server_sigalgs()` gibt es ab Python 3.15.
+
+#table(
+  columns: (1.2fr, 1.6fr, 1.8fr),
+  align: (left + horizon, left + horizon, left + horizon),
+  stroke: 0.5pt + rgb("#cbd5e0"),
+  fill: (col, row) => if row == 0 { rgb("#edf2f7") } else { none },
+  table.header([Bereich], [Phase alt, nicht PQ-sicher], [Phase neu, PQ-sicher]),
+  [Zertifikat], [X.509 v3, selbstsigniert], [X.509 v3, selbstsigniert, ML-DSA nach RFC 9881],
+  [Signatur], [ECDSA P-256, SHA-256], [ML-DSA-65 (FIPS 204)],
+  [Schlüsselaustausch], [nur X25519], [X25519MLKEM768, hybrid],
+  [TLS], [1.3], [1.3],
+)
+
+Zertifikat und Schlüsselaustausch sind getrennt. ML-DSA macht die Authentisierung PQ-sicher. Die Vertraulichkeit der Sitzung hängt am Schlüsselaustausch, also an ML-KEM. ML-KEM setzt TLS 1.3 voraus. OpenSSL 3.5 bietet standardmäßig bereits den hybriden Schlüsselaustausch an. Die alte Phase muss die Gruppe deshalb ausdrücklich auf `X25519` setzen, sonst ist sie nicht klassisch.
+
+Maßstab für die nicht-PQ-Seite ist die BSI TR-02102-2: mindestens TLS 1.2, empfohlen TLS 1.3, kein statischer RSA-Schlüsseltausch, kein CBC, kein 3DES und kein RC4. Für den Prototyp reicht die eine Suite von TLS 1.3 mit dem expliziten Gruppenzwang.
+
+== Zertifikate erzeugen
+
+Beide Zertifikate entstehen außerhalb von Python. `old.crt` liegt in der Config-Basis des Agenten. `new.crt` liegt bei der CA in `pub/` und wird über TLS ausgeliefert. Die Schlüsseldateien liegen nicht in `pub/`.
+
+```bash
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -sha256 -nodes \
+  -keyout old.key -out old.crt -days 365 \
+  -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost"
+
+openssl req -x509 -newkey mldsa65 -nodes \
+  -keyout new.key -out new.crt -days 365 \
+  -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost"
+```
+
+`-x509` erzeugt das selbstsignierte Zertifikat direkt. `-nodes` speichert den privaten Schlüssel ohne Passwort. Der Name in `subjectAltName` muss zur aufgerufenen Adresse passen. Kontrolle des neuen Zertifikats: `openssl x509 -in new.crt -noout -text` zeigt als Signaturalgorithmus `ML-DSA-65`. Eine RSA-2048-Alternative ist möglich, für den Prototyp ist ECDSA P-256 die kleinere und heute übliche Wahl.
+
+== CA und Agent
+
+Die lauffähige Fassung liegt im Paket `prototype/`. Die CA bietet beide Zertifikate gleichzeitig an, je eines pro Algorithmus. OpenSSL wählt pro Verbindung das Zertifikat, dessen Signatur der Client in `signature_algorithms` erlaubt. Eine Umschaltung der ganzen CA nach dem ersten Download gibt es nicht: ein zweiter Agent kann danach immer noch mit `cert_CA_old` beginnen.
+
+`set_groups` und `set_server_sigalgs` gibt es in der Python-Standardbibliothek erst ab Python 3.15. Dieses System hat Python 3.13 gegen OpenSSL 3.6, aber ohne diese beiden Aufrufe. Der Prototyp spricht deshalb dasselbe OpenSSL über `s_server` und `s_client` an. Die Zertifikate entstehen mit `openssl req`. Private Schlüssel liegen unter `runtime/keys` und nicht im ausgelieferten Verzeichnis `runtime/pub`.
+
+```bash
+python3 -m prototype certs
+python3 -m prototype ca
+python3 -m prototype agent
+python3 -m prototype selftest
+```
+
+Der Agent prüft die erste Verbindung nur gegen `config/old.crt`, Gruppe `X25519`, Signatur `ecdsa_secp256r1_sha256`. Das empfangene PEM wird nur für die zweite Verbindung als Vertrauensanker benutzt, Gruppe `X25519MLKEM768`, Signatur `mldsa65`. Ein Neustart ist nicht nötig. Der Selftest fährt die CA hoch und lässt zwei Agenten nacheinander denselben Wechsel ausführen.
+
+== Offene Punkte nach dem Meeting
+
+- Gleichzeitige Agenten teilen sich den einen `s_server`-Prozess, der Verbindungen nacheinander annimmt. Der Vertrauensanker wird dabei nicht umgeschaltet. Ein Thread-Pool wie in der Python-3.15-Skizze ist damit noch nicht umgesetzt.
+- Der Selftest prüft den Wechsel auf diesem Rechner. Er ersetzt keine Messung auf einem Steuergerät.
+
+#pagebreak()
+
 = Inkrementeller Sprint-Plan (Semesterverlauf)
 
-Das Projekt folgt einem inkrementellen Vorgehen in 2 bis 3 Wochen Sprints.
+Das Projekt folgt einem inkrementellen Vorgehen in 2 bis 3 Wochen Sprints. Der erste lauffähige Stand ist der getCert-Wechsel aus Meeting 1. Die Dual-Signature der späteren Sprints bleibt die Untersuchung von RQ1.
 
 #table(
   columns: (1fr, 1.8fr, 3fr),
@@ -316,6 +412,12 @@ Das Projekt folgt einem inkrementellen Vorgehen in 2 bis 3 Wochen Sprints.
 + Open Quantum Safe Project. *oqs-provider* für OpenSSL 3.3 und 3.4. #link("https://github.com/open-quantum-safe/oqs-provider")
 
 + OpenSSL Project. OpenSSL 3.3, OpenSSL 3.4 und OpenSSL 3.5. #link("https://www.openssl.org/")
+
++ IETF (2025). *Algorithm Identifiers for the Module-Lattice-Based Digital Signature Algorithm (ML-DSA).* RFC 9881. #link("https://www.rfc-editor.org/rfc/rfc9881.html")
+
++ Bundesamt für Sicherheit in der Informationstechnik. *TR-02102-2: Kryptographische Mechanismen, Verwendung von Transport Layer Security.* #link("https://www.bsi.bund.de/DE/Themen/Unternehmen-und-Organisationen/Standards-und-Zertifizierung/Technische-Richtlinien/TR-nach-Thema-sortiert/tr02102/tr02102_node.html")
+
++ Python Software Foundation. *ssl -- TLS/SSL wrapper for socket objects*, Gruppen-API ab Python 3.15. #link("https://docs.python.org/3/library/ssl.html")
 
 + Bananenfalter (2012). *Orange blue public key infrastructure 1 de.* Wikimedia Commons, CC0. #link("https://commons.wikimedia.org/wiki/File:Orange_blue_public_key_infrastructure_1_de.svg")
 
